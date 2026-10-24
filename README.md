@@ -35,7 +35,5 @@ CSATTT-BTL--Nhom9/
     └── burp/                          # TV4 (mẫu request tấn công)
 ```
 
-Quy tắc: mỗi file chỉ một người sửa. Muốn sửa file của người khác, báo người đó trước.
-    └── burp/                          # TV4 (mẫu request tấn công)
 
 Quy tắc: mỗi file chỉ một người sửa. Muốn sửa file của người khác, báo người đó trước.
