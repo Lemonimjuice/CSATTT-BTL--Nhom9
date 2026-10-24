@@ -1,6 +1,7 @@
 # C-s-an-to-n-th-ng-tin-BTL--Nh-m-9
 ## Cấu trúc thư mục và người phụ trách
 
+```
 CSATTT-BTL--Nhom9/
 ├── README.md                          # TV1 (dựng khung, cập nhật khi có thay đổi chung)
 ├── .gitignore                         # TV1
@@ -31,6 +32,10 @@ CSATTT-BTL--Nhom9/
 │       └── 03-seed-data.sql           # TV4 (dữ liệu mẫu: Admin, User A, User B)
 └── tests/                             # TV4
     ├── postman/                       # TV4 (Postman Collection)
+    └── burp/                          # TV4 (mẫu request tấn công)
+```
+
+Quy tắc: mỗi file chỉ một người sửa. Muốn sửa file của người khác, báo người đó trước.
     └── burp/                          # TV4 (mẫu request tấn công)
 
 Quy tắc: mỗi file chỉ một người sửa. Muốn sửa file của người khác, báo người đó trước.
