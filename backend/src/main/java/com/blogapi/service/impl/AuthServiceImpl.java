@@ -10,11 +10,13 @@ import com.blogapi.exception.TokenException;
 import com.blogapi.repository.RefreshTokenRepository;
 import com.blogapi.repository.UserRepository;
 import com.blogapi.security.JwtService;
+import com.blogapi.security.AuditLogValues;
 import com.blogapi.service.AuthService;
 import com.blogapi.util.EntityMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -53,7 +55,7 @@ public class AuthServiceImpl implements AuthService {
                 .build();
 
         user = userRepository.save(user);
-        log.info("New user registered: {}", user.getUsername());
+        log.info("New user registered: {}", AuditLogValues.username(user.getUsername()));
 
         return buildAuthResponse(user);
     }
@@ -61,12 +63,18 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public AuthResponse login(LoginRequest request) {
-        authManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.username(), request.password()));
+        try {
+            authManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.username(), request.password()));
+        } catch (AuthenticationException ex) {
+            log.warn("event=login_failure username={} ip={}", AuditLogValues.username(request.username()), AuditLogValues.clientIp());
+            throw ex;
+        }
 
         User user = userRepository.findByUsername(request.username()).orElseThrow();
-        log.info("User logged in: {}", user.getUsername());
-        return buildAuthResponse(user);
+        AuthResponse response = buildAuthResponse(user);
+        log.info("event=login_success username={} ip={}", AuditLogValues.username(user.getUsername()), AuditLogValues.clientIp());
+        return response;
     }
 
     @Override
@@ -84,7 +92,7 @@ public class AuthServiceImpl implements AuthService {
         if (!userDetails.isEnabled())
             throw new TokenException("Account is disabled");
         String newAccess = jwtService.generateAccessToken(userDetails);
-        log.debug("Access token refreshed for user: {}", stored.getUser().getUsername());
+        log.debug("Access token refreshed for user: {}", AuditLogValues.username(stored.getUser().getUsername()));
         return RefreshResponse.of(newAccess);
     }
 

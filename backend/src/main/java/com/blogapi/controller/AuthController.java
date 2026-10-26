@@ -3,6 +3,7 @@ package com.blogapi.controller;
 import com.blogapi.dto.request.AuthRequests.*;
 import com.blogapi.dto.response.Responses.*;
 import com.blogapi.service.AuthService;
+import com.blogapi.security.AuditLogValues;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,13 +21,13 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
-        log.debug("Register request for username={}", request.username());
+        log.debug("Register request for username={}", AuditLogValues.username(request.username()));
         return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
     }
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        log.debug("Login attempt for username={}", request.username());
+        log.debug("Login attempt for username={}", AuditLogValues.username(request.username()));
         return ResponseEntity.ok(authService.login(request));
     }
 

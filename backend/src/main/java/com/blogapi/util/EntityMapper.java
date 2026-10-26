@@ -20,6 +20,11 @@ public final class EntityMapper {
         return new UserSummary(user.getId(), user.getUsername(), user.getEmail(), user.getRole());
     }
 
+    public static PublicUserSummary toPublicUserSummary(User user) {
+        if (user == null) return null;
+        return new PublicUserSummary(user.getId(), user.getUsername(), user.getRole());
+    }
+
     // ── Category ─────────────────────────────────────────────────────────────
 
     public static CategoryResponse toCategoryResponse(Category c) {
@@ -36,7 +41,7 @@ public final class EntityMapper {
                 .filter(c -> !c.isDeleted()).count();
         return new PostSummaryResponse(
                 p.getId(), p.getTitle(), p.getSlug(), p.getSummary(), p.getStatus(),
-                toUserSummary(p.getAuthor()), toCategoryResponse(p.getCategory()),
+                toPublicUserSummary(p.getAuthor()), toCategoryResponse(p.getCategory()),
                 commentCount, p.getCreatedAt(), p.getUpdatedAt());
     }
 
@@ -45,7 +50,7 @@ public final class EntityMapper {
                 .filter(c -> !c.isDeleted()).count();
         return new PostDetailResponse(
                 p.getId(), p.getTitle(), p.getSlug(), p.getContent(), p.getSummary(),
-                p.getStatus(), toUserSummary(p.getAuthor()), toCategoryResponse(p.getCategory()),
+                p.getStatus(), toPublicUserSummary(p.getAuthor()), toCategoryResponse(p.getCategory()),
                 commentCount, p.getCreatedAt(), p.getUpdatedAt());
     }
 
@@ -57,7 +62,7 @@ public final class EntityMapper {
      */
     public static CommentResponse toCommentResponse(Comment c) {
         String displayContent = c.isDeleted() ? "[deleted]" : c.getContent();
-        UserSummary author = c.isDeleted() ? null : toUserSummary(c.getAuthor());
+        PublicUserSummary author = c.isDeleted() ? null : toPublicUserSummary(c.getAuthor());
         Long parentId = c.getParent() == null ? null : c.getParent().getId();
 
         List<CommentResponse> replies = (c.getReplies() == null || c.getReplies().isEmpty())

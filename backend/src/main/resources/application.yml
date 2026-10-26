@@ -1,5 +1,7 @@
 server:
   port: 8080
+  # No trusted reverse proxy has been established; audit the direct peer only.
+  forward-headers-strategy: none
 
 spring:
   application:

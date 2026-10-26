@@ -19,7 +19,6 @@ public class PostReadAccessPolicy {
         boolean owner = post.getAuthor().getUsername().equals(username);
         boolean admin = userRepository.findByUsername(username)
                 .map(user -> user.getRole() == User.Role.ADMIN).orElse(false);
-        // Retain the existing Post response message as well as its owner/ADMIN policy.
-        if (!owner && !admin) throw new ForbiddenException("You do not have permission to modify this post");
+        if (!owner && !admin) throw new ForbiddenException("You do not have permission to read this post");
     }
 }

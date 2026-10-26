@@ -30,6 +30,7 @@ public class Responses {
     // ── User ─────────────────────────────────────────────────────────────────
 
     public record UserSummary(Long id, String username, String email, Role role) {}
+    public record PublicUserSummary(Long id, String username, Role role) {}
 
     // ── Category ─────────────────────────────────────────────────────────────
 
@@ -50,7 +51,7 @@ public class Responses {
             String slug,
             String summary,
             Status status,
-            UserSummary author,
+            PublicUserSummary author,
             CategoryResponse category,
             long commentCount,
             LocalDateTime createdAt,
@@ -64,7 +65,7 @@ public class Responses {
             String content,
             String summary,
             Status status,
-            UserSummary author,
+            PublicUserSummary author,
             CategoryResponse category,
             long commentCount,
             LocalDateTime createdAt,
@@ -77,7 +78,7 @@ public class Responses {
             Long id,
             String content,
             boolean deleted,
-            UserSummary author,
+            PublicUserSummary author,
             Long parentId,
             int depth,
             List<CommentResponse> replies,
