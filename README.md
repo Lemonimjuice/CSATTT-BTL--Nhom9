@@ -40,3 +40,48 @@ CSATTT-BTL--Nhom9/
 
 
 Quy tắc: mỗi file chỉ một người sửa. Muốn sửa file của người khác, báo người đó trước.
+Quy ước nhánh, header, rate limit...: [docs/decisions.md](docs/decisions.md). Cổng, service, biến môi trường: [docs/contract/ports-and-env.md](docs/contract/ports-and-env.md).
+
+## Chạy stack chính
+
+Yêu cầu: Docker Desktop (Compose v2), Git Bash (có sẵn `openssl` và `sh`). Chạy từ thư mục gốc repo.
+
+**1. Tạo file `.env`** từ mẫu rồi thay mọi giá trị bằng chuỗi ngẫu nhiên mới (cách sinh ghi trong `.env.example`). `JWT_SECRET` phải là Base64, `APP_DB_PASSWORD` tối thiểu 24 ký tự.
+
+```bash
+cp .env.example .env
+```
+
+**2. Sinh chứng chỉ tự ký** (có SAN cho `localhost` và `127.0.0.1`; khóa không được commit):
+
+```bash
+sh nginx/certs/generate-cert.sh
+```
+
+**3. Build và chạy** (lần đầu mất vài phút để Maven tải thư viện):
+
+```bash
+docker compose up -d --build --wait
+```
+
+**4. Kiểm tra qua Nginx.** Lặp lại vài lần thì header `X-Upstream` sẽ đổi luân phiên giữa 2 node:
+
+```bash
+curl -i --cacert nginx/certs/server.crt https://localhost/actuator/health
+```
+
+**Sửa file SQL trong `database/init/` xong phải xóa volume** rồi chạy lại. PostgreSQL chỉ chạy script khởi tạo khi volume trống. Lệnh này xóa toàn bộ dữ liệu cũ:
+
+```bash
+docker compose down -v
+```
+
+Demo 1 (failover): dùng tên service, không dùng tên container.
+
+```bash
+docker compose stop backend-node-1
+```
+
+## Nguồn mã
+
+Backend dựa trên [Spring-Boot-Blog-API](https://github.com/DevFinesse/Spring-Boot-Blog-API) của tác giả DevFinesse. Kho gốc không kèm giấy phép; nhóm chỉ dùng cho mục đích học tập và ghi rõ nguồn.

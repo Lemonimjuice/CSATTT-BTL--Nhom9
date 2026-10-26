@@ -1,0 +1,7 @@
+# File được mount/chạy trong container Linux phải giữ LF kể cả khi clone trên Windows
+# (psql đọc sai meta-command như \getenv, \if nếu dòng kết thúc bằng CRLF).
+*.sh   text eol=lf
+*.sql  text eol=lf
+*.conf text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf

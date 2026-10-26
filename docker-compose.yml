@@ -1,3 +1,9 @@
+# Stack chính của nhóm 9. Biến môi trường đọc từ .env (mẫu: .env.example).
+# Danh sách cổng, service, biến: docs/contract/ports-and-env.md
+#
+# Lưu ý: PostgreSQL chỉ chạy database/init/*.sql khi volume postgres_data còn trống.
+# Sửa SQL xong phải chạy `docker compose down -v` rồi `up` lại (mất dữ liệu cũ).
+
 networks:
   dmz_net:
     driver: bridge
@@ -5,15 +11,41 @@ networks:
     driver: bridge
     internal: true          # vùng lõi: không có đường ra Internet, không publish cổng
 
+# Cấu hình chung cho 2 node: cùng image, cùng DB, cùng JWT secret (để Demo 1 không phải đăng nhập lại)
+x-backend: &backend
+  build: ./backend
+  image: nhom9/blog-api:local
+  environment:
+    DB_HOST: database
+    DB_PORT: "5432"
+    DB_NAME: blogdb
+    DB_USERNAME: ${APP_DB_USERNAME:-app_user}      # tài khoản quyền tối thiểu, KHÔNG phải postgres_admin
+    DB_PASSWORD: ${APP_DB_PASSWORD:?Đặt APP_DB_PASSWORD trong .env}
+    JWT_SECRET: ${JWT_SECRET:?Đặt JWT_SECRET (Base64 >= 32 byte) trong .env}
+    SPRING_PROFILES_ACTIVE: integration           # ddl-auto=validate, không tự sửa schema
+    SQLI_DEMO_ENABLED: "false"                    # cụm /vuln không bao giờ bật trên backend chính
+  depends_on:
+    database:
+      condition: service_healthy
+  healthcheck:
+    test: [CMD-SHELL, "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+    interval: 10s
+    timeout: 5s
+    retries: 10
+    start_period: 60s
+  networks:
+    - internal_net
+  restart: unless-stopped   # `docker compose stop` (Demo 1) vẫn giữ node ở trạng thái tắt
+
 services:
   nginx-waf:
-    image: nginx:alpine     # TV2 sẽ thay bằng image có ModSecurity + OWASP CRS
+    image: nginx:1.28-alpine   # TV2 sẽ thay bằng image có ModSecurity + OWASP CRS (nginx >= 1.27.3 để dùng `resolve`)
     ports:
       - "80:80"             # chỉ để redirect 80 -> 443
-      - "443:443"           # [SỬA] cổng HTTPS chính, trước đây chưa mở
+      - "443:443"           # cổng HTTPS chính
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/certs:/etc/nginx/certs:ro   # [SỬA] trước đây chưa mount, nginx không đọc được chứng chỉ
+      - ./nginx/certs:/etc/nginx/certs:ro
     networks:
       - dmz_net
       - internal_net
@@ -22,31 +54,30 @@ services:
       - backend-node-2
     restart: unless-stopped
 
-  # Backend giả lập (http-echo) để kiểm thử hạ tầng; TV3 sẽ thay bằng image Spring Boot
   backend-node-1:
-    image: hashicorp/http-echo
-    command: -text="Response from Backend Node 1" -listen=:8080
-    environment:
-      JWT_SECRET: ${JWT_SECRET}       # [THÊM] 2 node dùng chung 1 secret (đọc từ file .env)
-    networks:
-      - internal_net
+    <<: *backend
 
   backend-node-2:
-    image: hashicorp/http-echo
-    command: -text="Response from Backend Node 2" -listen=:8080
-    environment:
-      JWT_SECRET: ${JWT_SECRET}
-    networks:
-      - internal_net
+    <<: *backend
 
   database:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: postgres_admin
-      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:-changeme_local}
+      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:?Đặt DB_ADMIN_PASSWORD trong .env}
       POSTGRES_DB: blogdb
+      # 02-least-privilege.sql đọc 2 biến này để tạo tài khoản ứng dụng
+      APP_DB_USERNAME: ${APP_DB_USERNAME:-app_user}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Đặt APP_DB_PASSWORD trong .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro   # 01 schema, 02 quyền, 03 seed (TV4)
+    healthcheck:
+      # Cổng TCP chỉ mở sau khi các script init chạy xong (server init chỉ nghe qua socket)
+      test: [CMD-SHELL, "pg_isready -h 127.0.0.1 -U postgres_admin -d blogdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     networks:
       - internal_net
     restart: unless-stopped
