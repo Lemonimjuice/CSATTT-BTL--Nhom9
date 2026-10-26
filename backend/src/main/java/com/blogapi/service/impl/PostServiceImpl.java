@@ -13,6 +13,7 @@ import com.blogapi.repository.CategoryRepository;
 import com.blogapi.repository.PostRepository;
 import com.blogapi.repository.UserRepository;
 import com.blogapi.service.PostService;
+import com.blogapi.security.PostReadAccessPolicy;
 import com.blogapi.util.EntityMapper;
 import com.blogapi.util.SlugUtils;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class PostServiceImpl implements PostService {
     private final PostRepository     postRepository;
     private final UserRepository     userRepository;
     private final CategoryRepository categoryRepository;
+    private final PostReadAccessPolicy postReadAccessPolicy;
 
     @Override
     @Transactional
@@ -167,9 +169,7 @@ public class PostServiceImpl implements PostService {
     }
 
     private void assertCanRead(Post post, String username) {
-        if (post.getStatus() == Status.PUBLISHED) return;
-        if (username == null) throw new ForbiddenException("You do not have permission to read this post");
-        assertOwnerOrAdmin(post, username);
+        postReadAccessPolicy.assertCanRead(post, username);
     }
 
     private String ensureUniqueSlug(String base) {

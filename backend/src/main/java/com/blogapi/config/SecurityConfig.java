@@ -1,6 +1,7 @@
 package com.blogapi.config;
 
 import com.blogapi.security.JwtAuthenticationFilter;
+import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -37,6 +38,9 @@ public class SecurityConfig {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                        // Preserve the backend's original 401/403 during servlet error dispatch.
+                        // A direct REQUEST to /error still requires authentication below.
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         // Swagger / OpenAPI docs
                         .requestMatchers(
                                 "/v3/api-docs/**",

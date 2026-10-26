@@ -1,5 +1,6 @@
 package com.blogapi.security;
 
+import com.blogapi.config.MdcLoggingFilter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -53,6 +54,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     );
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
+                    request.setAttribute(MdcLoggingFilter.AUTHENTICATED_USER_ATTRIBUTE, userDetails.getUsername());
                     log.debug("Authenticated user: {}", username);
                 }
             }

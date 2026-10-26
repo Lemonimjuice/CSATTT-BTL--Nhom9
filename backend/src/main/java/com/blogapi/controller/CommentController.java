@@ -30,10 +30,12 @@ public class CommentController {
     public ResponseEntity<PageResponse<CommentResponse>> getByPost(
             @PathVariable Long postId,
             @RequestParam(defaultValue = "0")  int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal UserDetails userDetails) {
         return ResponseEntity.ok(commentService.getByPost(
                 postId, PageRequest.of(page, Math.min(size, 100),
-                        Sort.by(Sort.Direction.ASC, "createdAt"))));
+                        Sort.by(Sort.Direction.ASC, "createdAt")),
+                userDetails == null ? null : userDetails.getUsername()));
     }
 
     /**
@@ -41,8 +43,9 @@ public class CommentController {
      * Returns a single comment with its full nested reply tree.
      */
     @GetMapping("/comments/{id}")
-    public ResponseEntity<CommentResponse> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(commentService.getById(id));
+    public ResponseEntity<CommentResponse> getById(@PathVariable Long id,
+                                                  @AuthenticationPrincipal UserDetails userDetails) {
+        return ResponseEntity.ok(commentService.getById(id, userDetails == null ? null : userDetails.getUsername()));
     }
 
     /**

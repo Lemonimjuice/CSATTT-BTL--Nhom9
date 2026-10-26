@@ -11,6 +11,7 @@ import com.blogapi.repository.CommentRepository;
 import com.blogapi.repository.PostRepository;
 import com.blogapi.repository.UserRepository;
 import com.blogapi.service.CommentService;
+import com.blogapi.security.PostReadAccessPolicy;
 import com.blogapi.util.EntityMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +32,7 @@ public class CommentServiceImpl implements CommentService {
     private final CommentRepository commentRepository;
     private final PostRepository    postRepository;
     private final UserRepository    userRepository;
+    private final PostReadAccessPolicy postReadAccessPolicy;
 
     // ── Create ────────────────────────────────────────────────────────────────
 
@@ -38,6 +40,7 @@ public class CommentServiceImpl implements CommentService {
     @Transactional
     public CommentResponse create(Long postId, CreateCommentRequest request, String username) {
         Post post   = findPostOrThrow(postId);
+        postReadAccessPolicy.assertCanRead(post, username);
         User author = findUserOrThrow(username);
 
         Comment parent = null;
@@ -110,8 +113,8 @@ public class CommentServiceImpl implements CommentService {
      */
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<CommentResponse> getByPost(Long postId, Pageable pageable) {
-        findPostOrThrow(postId); // validate post exists
+    public PageResponse<CommentResponse> getByPost(Long postId, Pageable pageable, String requesterUsername) {
+        postReadAccessPolicy.assertCanRead(findPostOrThrow(postId), requesterUsername);
         Page<Comment> topLevel = commentRepository.findTopLevelByPostId(postId, pageable);
 
         List<CommentResponse> responses = topLevel.getContent().stream()
@@ -130,8 +133,10 @@ public class CommentServiceImpl implements CommentService {
 
     @Override
     @Transactional(readOnly = true)
-    public CommentResponse getById(Long commentId) {
-        return loadRepliesAndMap(findCommentOrThrow(commentId));
+    public CommentResponse getById(Long commentId, String requesterUsername) {
+        Comment comment = findCommentOrThrow(commentId);
+        postReadAccessPolicy.assertCanRead(comment.getPost(), requesterUsername);
+        return loadRepliesAndMap(comment);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
+import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.lang.NonNull;
 import org.springframework.security.core.Authentication;
@@ -18,9 +19,13 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 @Component
-@Order(1)
+// One servlet registration, outside and before Spring Security; do not also add to its chain.
+@Order(Ordered.HIGHEST_PRECEDENCE + 1)
 @Slf4j
 public class MdcLoggingFilter extends OncePerRequestFilter {
+
+    // Server-only request attribute: the security context is cleared before this outer filter returns.
+    public static final String AUTHENTICATED_USER_ATTRIBUTE = MdcLoggingFilter.class.getName() + ".authenticatedUser";
 
     private static final String REQUEST_ID_HEADER = "X-Request-ID";
     private static final Pattern SAFE_REQUEST_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,63}");
@@ -54,7 +59,10 @@ public class MdcLoggingFilter extends OncePerRequestFilter {
 
             // Populate userId after security context is set
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+            Object authenticatedUser = request.getAttribute(AUTHENTICATED_USER_ATTRIBUTE);
+            if (authenticatedUser instanceof String username) {
+                MDC.put(MDC_USER_ID, username);
+            } else if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
                 MDC.put(MDC_USER_ID, auth.getName());
             }
 
