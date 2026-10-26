@@ -23,6 +23,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     Page<Post> findAllByCategoryIdAndStatus(Long categoryId, Status status, Pageable pageable);
 
     Page<Post> findAllByAuthorIdAndStatus(Long authorId, Status status, Pageable pageable);
+    Page<Post> findAllByAuthorUsername(String username, Pageable pageable);
 
     @Query("SELECT p FROM Post p WHERE p.status = :status AND " +
            "(LOWER(p.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +

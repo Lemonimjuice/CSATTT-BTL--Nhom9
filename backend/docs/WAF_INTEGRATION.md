@@ -96,7 +96,7 @@ Thành viên WAF cần cấu hình JSON request-body inspection cho hai route PO
 4. Nginx sinh request ID và chuyển `X-Request-ID` tới backend. Backend chỉ giữ ID 1–64 ký tự `[A-Za-z0-9][A-Za-z0-9._-]*`, input khác được thay UUID. Không tin response header giả do client đưa vào; Nginx phải sở hữu marker WAF.
 5. Che Authorization, password, refresh token và dữ liệu Record trong log chia sẻ; không log nguyên toàn bộ request/response auth.
 
-Không dùng riêng HTTP `403`, hình dạng body hoặc sự hiện diện `X-Request-ID` để kết luận nguồn chặn. Backend ownership cũng trả `403`. `MdcLoggingFilter` có trả `X-Request-ID` và log method/path/status khi request đi tới filter; request bị SecurityFilterChain chặn sớm có thể không có log này. Bằng chứng WAF gồm marker do Nginx tạo **và** CRS audit tương ứng; request bị WAF chặn không tới handler search của backend.
+Không dùng riêng HTTP `403`, hình dạng body hoặc sự hiện diện `X-Request-ID` để kết luận nguồn chặn. Backend ownership cũng trả `403`. `MdcLoggingFilter` hiện chạy trước Spring Security; 401/403 do backend và exception trong luồng đã vào filter có access event/Request ID, không ghi JWT/body. WAF chặn trước backend không đi qua filter này. Bằng chứng WAF vẫn cần marker do Nginx tạo **và** CRS audit tương ứng; không suy ra WAF PASS chỉ từ status hoặc sự thiếu/vắng log backend.
 
 ## 5. Trình tự kiểm thử tích hợp
 
@@ -119,6 +119,6 @@ Không dùng riêng HTTP `403`, hình dạng body hoặc sự hiện diện `X-R
 
 ## 7. Trạng thái kiểm chứng
 
-Docker E2E source nhóm ngày 27/10/2026 kết thúc với exit code 0: Maven 39/39, HTTP secure/lab 30/30 và two-node HTTP 12/12 PASS. Lab HTTP qua gateway loopback, identity/DB/JWT separation, network isolation và cleanup đã chạy thật và PASS. Normal alpha trả 1 fixture; Boolean SQLi trả 3 fixture qua gateway, minh chứng gateway test không chặn payload. Chi tiết tại [hợp đồng V2](../../docs/contract/tv3-v2-handover.md) và [gateway test](SQLI_TEST_GATEWAY.md).
+Docker E2E hardening mới ngày 27/10/2026 kết thúc với exit code 0: Maven 152/152, HTTP secure/lab 42/42 và two-node HTTP 12/12 PASS. Lab HTTP qua gateway loopback, identity/DB/JWT separation, network isolation và cleanup đã chạy thật và PASS. Normal alpha trả 1 fixture; Boolean SQLi trả 3 fixture qua gateway, minh chứng gateway test không chặn payload. Backend audit hiện dùng peer IP, không tin forwarded IP headers khi chưa chốt proxy trust. Chi tiết tại [Feature Freeze](FEATURE_FREEZE.md), [hợp đồng V2](../../docs/contract/tv3-v2-handover.md) và [gateway test](SQLI_TEST_GATEWAY.md).
 
 Chưa có bằng chứng ModSecurity/CRS end-to-end trong repository này. Các expected WAF `403` ở mục 4–5 vẫn là tiêu chí tích hợp, không phải kết quả đã chạy.

@@ -1,8 +1,10 @@
 # Bàn giao Backend V2 cho TV1/TV2 — 27/10/2026
 
+> Bảng E2E 92/30/12 bên dưới là baseline `101d4c6`. Hardening mới giữ nguyên 92 tests cũ và đạt **152 Maven / 42 HTTP secure-lab / 12 two-node PASS**, exit code 0. Xem [FEATURE_FREEZE.md](../../backend/docs/FEATURE_FREEZE.md) và [API contract notes](api-endpoints.md) trước nghiệm thu: author không còn email, sort được whitelist, `/posts/me` có đủ trạng thái, JWT được validate startup và audit dùng peer IP. Nginx/WAF tích hợp vẫn NOT RUN.
+
 Nhánh bàn giao: `feat/tv3-backend`. Phạm vi: backend và hợp đồng TV3. Gateway HTTP trong bộ test là tài nguyên tạm để kiểm thử, không phải WAF/ModSecurity hoặc gateway production của TV1/TV2. Không thay đổi schema, JWT contract hoặc API endpoints trong phần bổ sung E2E.
 
-## Kết quả Docker E2E đã thực thi
+## Kết quả Docker E2E baseline đã thực thi tại 101d4c6
 
 Lần chạy cuối của `backend/scripts/Test-V2Host.ps1` trên Docker Engine **29.9.2**, Compose **v5.6.1** kết thúc với **exit code 0**. Java 21 / Maven chạy trong builder của `backend/Dockerfile`, PostgreSQL 16 thật cho lab và hai main node.
 

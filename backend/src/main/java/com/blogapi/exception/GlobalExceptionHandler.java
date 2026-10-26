@@ -22,6 +22,11 @@ import java.util.Map;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(InvalidRequestException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidRequest(InvalidRequestException ex, WebRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ErrorResponse> handleMissingEndpoint(NoResourceFoundException ex, WebRequest request) {
         return buildResponse(HttpStatus.NOT_FOUND, "Endpoint not found", request);
@@ -34,31 +39,31 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex, WebRequest request) {
-        log.warn("Resource not found: {}", ex.getMessage());
+        log.warn("Resource not found");
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request);
     }
 
     @ExceptionHandler(DuplicateResourceException.class)
     public ResponseEntity<ErrorResponse> handleDuplicate(DuplicateResourceException ex, WebRequest request) {
-        log.warn("Duplicate resource: {}", ex.getMessage());
+        log.warn("Duplicate resource");
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request);
     }
 
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<ErrorResponse> handleForbidden(ForbiddenException ex, WebRequest request) {
-        log.warn("Forbidden: {}", ex.getMessage());
+        log.warn("Forbidden");
         return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage(), request);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex, WebRequest request) {
-        log.warn("Access denied: {}", ex.getMessage());
+        log.warn("Access denied");
         return buildResponse(HttpStatus.FORBIDDEN, "Access denied", request);
     }
 
     @ExceptionHandler(TokenException.class)
     public ResponseEntity<ErrorResponse> handleToken(TokenException ex, WebRequest request) {
-        log.warn("Token error: {}", ex.getMessage());
+        log.warn("Token rejected");
         return buildResponse(HttpStatus.UNAUTHORIZED, ex.getMessage(), request);
     }
 
@@ -81,7 +86,7 @@ public class GlobalExceptionHandler {
             String message = error.getDefaultMessage();
             errors.put(fieldName, message);
         });
-        log.warn("Validation failed: {}", errors);
+        log.warn("Validation failed for fields: {}", errors.keySet());
 
         ValidationErrorResponse response = new ValidationErrorResponse(
                 LocalDateTime.now(),
@@ -95,7 +100,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneric(Exception ex, WebRequest request) {
-        log.error("Unhandled exception: ", ex);
+        // Exception messages/driver detail may contain request values or credentials.
+        log.error("Unhandled exception type={}", ex.getClass().getSimpleName());
         return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred", request);
     }
 

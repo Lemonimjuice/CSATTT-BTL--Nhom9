@@ -1,5 +1,7 @@
 # Backend handover — V2
 
+> Cập nhật Feature Freeze: source hardening mới đã chạy Docker E2E **152 Maven / 42 HTTP secure-lab / 12 two-node PASS**, không failures/errors/skips. Các số liệu 92/30/12 bên dưới là baseline `101d4c6`. Thay đổi contract và giới hạn mới cho TV1/TV4: [FEATURE_FREEZE.md](FEATURE_FREEZE.md).
+
 Tài liệu hiện hành cho repository nhóm: [TV3 V2 handover](../../docs/contract/tv3-v2-handover.md) và [backend README](../README.md). Các hướng dẫn Compose standalone cũ đã được thay thế.
 
 ## Hành vi API

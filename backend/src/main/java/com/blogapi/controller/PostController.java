@@ -3,6 +3,7 @@ package com.blogapi.controller;
 import com.blogapi.dto.request.PostRequests.*;
 import com.blogapi.dto.response.Responses.*;
 import com.blogapi.service.PostService;
+import com.blogapi.exception.InvalidRequestException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +16,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Set;
+
 @RestController
 @RequestMapping("/api/v1/posts")
 @RequiredArgsConstructor
@@ -22,6 +25,7 @@ import org.springframework.web.bind.annotation.*;
 public class PostController {
 
     private final PostService postService;
+    private static final Set<String> SORT_PROPERTIES = Set.of("id", "title", "createdAt", "updatedAt");
 
     // ── Public reads ──────────────────────────────────────────────────────────
 
@@ -118,7 +122,14 @@ public class PostController {
     // ── Util ──────────────────────────────────────────────────────────────────
 
     private Pageable buildPageable(int page, int size, String sortParam) {
-        String[] parts = sortParam.split(",");
+        if (page < 0 || size < 1) throw new InvalidRequestException("Invalid pagination");
+        String[] parts = sortParam.split(",", -1);
+        if (parts.length > 2 || !SORT_PROPERTIES.contains(parts[0])) {
+            throw new InvalidRequestException("Unsupported sort property");
+        }
+        if (parts.length == 2 && !parts[1].equalsIgnoreCase("asc") && !parts[1].equalsIgnoreCase("desc")) {
+            throw new InvalidRequestException("Unsupported sort direction");
+        }
         Sort.Direction direction = parts.length > 1 && parts[1].equalsIgnoreCase("asc")
                 ? Sort.Direction.ASC : Sort.Direction.DESC;
         return PageRequest.of(page, Math.min(size, 50), Sort.by(direction, parts[0]));

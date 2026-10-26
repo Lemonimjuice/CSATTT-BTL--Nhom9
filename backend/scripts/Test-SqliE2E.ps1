@@ -45,7 +45,9 @@ foreach ($label in @('a', 'b')) {
     $login = Call-Api "login-$label" $BaseUrl POST '/api/v1/auth/login' @{
         username = $username; password = $password
     } $null 200
-    $tokens += ($login.Content | ConvertFrom-Json).accessToken
+    $loginData = $login.Content | ConvertFrom-Json
+    if ($loginData.user.email -ne "$username@example.test") { throw 'Authenticated self email contract changed (body omitted).' }
+    $tokens += $loginData.accessToken
 }
 $ownerToken = $tokens[0]
 $otherToken = $tokens[1]
@@ -69,6 +71,39 @@ $null = Call-Api 'secure-search-invalid-input' $BaseUrl POST $searchPath @{keywo
 $null = Call-Api 'vuln-disabled-on-main-backend' $BaseUrl POST '/api/v1/vuln/records/search' @{keyword='alpha'} $ownerToken 404
 $null = Call-Api 'posts-me-anonymous' $BaseUrl GET '/api/v1/posts/me' $null $null 401
 $null = Call-Api 'backend-health' $BaseUrl GET '/actuator/health' $null $null 200
+
+# Final-hardening contract checks on real PostgreSQL, using only this run's new accounts/data.
+$publishedPostId = $null
+foreach ($state in @('PUBLISHED', 'DRAFT', 'ARCHIVED')) {
+    $postResponse = Call-Api ("post-create-" + $state.ToLowerInvariant()) $BaseUrl POST '/api/v1/posts' @{
+        title="Contract check $suffix $state"; content='LAB-ONLY backend contract fixture'; status=$state
+    } $ownerToken 201
+    $postData = $postResponse.Content | ConvertFrom-Json
+    if ('email' -in $postData.author.PSObject.Properties.Name) { throw 'Post author response exposes email.' }
+    if ($state -eq 'PUBLISHED') { $publishedPostId = $postData.id }
+}
+if (-not $publishedPostId) { throw 'Published Post ID missing (body omitted).' }
+$publicPost = Call-Api 'public-post-no-email' $BaseUrl GET ("/api/v1/posts/$publishedPostId") $null $null 200
+if ('email' -in ($publicPost.Content | ConvertFrom-Json).author.PSObject.Properties.Name) { throw 'Public Post exposes email.' }
+foreach ($sort in @('author.password', 'abc')) {
+    $null = Call-Api ('unsafe-sort-' + $sort) $BaseUrl GET ('/api/v1/posts?sort=' + [uri]::EscapeDataString($sort)) $null $null 400
+}
+$null = Call-Api 'allowed-sort-postgres' $BaseUrl GET '/api/v1/posts?sort=createdAt%2Cdesc' $null $null 200
+$myPosts = Call-Api 'my-posts-all-own-statuses' $BaseUrl GET '/api/v1/posts/me' $null $ownerToken 200
+$page = $myPosts.Content | ConvertFrom-Json
+if ($page.totalElements -ne 3 -or @($page.content | Where-Object { $_.author.username -ne "sqlia$suffix" }).Count -ne 0) {
+    throw 'My Posts must return exactly this new owner''s three Posts.'
+}
+foreach ($state in @('PUBLISHED','DRAFT','ARCHIVED')) {
+    if ($state -notin @($page.content.status)) { throw 'My Posts omitted an owned status.' }
+}
+foreach ($postData in $page.content) {
+    if ('email' -in $postData.author.PSObject.Properties.Name) { throw 'My Posts author exposes email.' }
+}
+$null = Call-Api 'post-update-anonymous' $BaseUrl PUT ("/api/v1/posts/$publishedPostId") @{title='must not update'} $null 401
+$null = Call-Api 'post-update-other-denied' $BaseUrl PUT ("/api/v1/posts/$publishedPostId") @{title='must not update'} $otherToken 403
+$null = Call-Api 'post-delete-anonymous' $BaseUrl DELETE ("/api/v1/posts/$publishedPostId") $null $null 401
+$null = Call-Api 'post-delete-other-denied' $BaseUrl DELETE ("/api/v1/posts/$publishedPostId") $null $otherToken 403
 
 if ($LabBaseUrl) {
     # Lab has disposable identities and a separate JWT key. Never reuse a business token.

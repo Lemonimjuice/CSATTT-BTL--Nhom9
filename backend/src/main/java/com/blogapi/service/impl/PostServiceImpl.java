@@ -141,10 +141,7 @@ public class PostServiceImpl implements PostService {
     @Override
     @Transactional(readOnly = true)
     public PageResponse<PostSummaryResponse> getMyPosts(String username, Pageable pageable) {
-        User author = findUserOrThrow(username);
-        Page<Post> page = postRepository.findAll(pageable); // all statuses for own posts
-        // Filter by author in memory since we need all statuses
-        return toPageResponse(postRepository.findAllByAuthorIdAndStatus(author.getId(), Status.PUBLISHED, pageable));
+        return toPageResponse(postRepository.findAllByAuthorUsername(username, pageable));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 package com.blogapi.config;
 
+import com.blogapi.security.AuditLogValues;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -49,6 +50,8 @@ public class MdcLoggingFilter extends OncePerRequestFilter {
         MDC.put(MDC_REQUEST_ID, requestId);
         MDC.put(MDC_METHOD, request.getMethod());
         MDC.put(MDC_URI, request.getRequestURI());
+        // No proxy trust is configured: headers such as X-Forwarded-For are not IP evidence.
+        MDC.put("clientIp", request.getRemoteAddr());
 
         // Add response header so clients can correlate
         response.setHeader(REQUEST_ID_HEADER, requestId);
@@ -56,21 +59,28 @@ public class MdcLoggingFilter extends OncePerRequestFilter {
         long start = System.currentTimeMillis();
         try {
             filterChain.doFilter(request, response);
-
-            // Populate userId after security context is set
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            Object authenticatedUser = request.getAttribute(AUTHENTICATED_USER_ATTRIBUTE);
-            if (authenticatedUser instanceof String username) {
-                MDC.put(MDC_USER_ID, username);
-            } else if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
-                MDC.put(MDC_USER_ID, auth.getName());
-            }
-
-            long elapsed = System.currentTimeMillis() - start;
-            log.info("{} {} -> {} ({}ms)", request.getMethod(), request.getRequestURI(),
-                    response.getStatus(), elapsed);
+        } catch (IOException | ServletException | RuntimeException ex) {
+            // An escaped exception is a servlet 500 unless a response is already committed.
+            // Do not log an exception message, stack trace, headers or body here.
+            if (!response.isCommitted()) response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            throw ex;
         } finally {
-            MDC.clear();
+            try {
+                // Security may already have cleared its context; retain only validated identity.
+                Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                Object authenticatedUser = request.getAttribute(AUTHENTICATED_USER_ATTRIBUTE);
+                if (authenticatedUser instanceof String username) {
+                    MDC.put(MDC_USER_ID, AuditLogValues.username(username));
+                } else if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+                    MDC.put(MDC_USER_ID, AuditLogValues.username(auth.getName()));
+                }
+
+                long elapsed = System.currentTimeMillis() - start;
+                log.info("{} {} -> {} ({}ms) ip={}", request.getMethod(), request.getRequestURI(),
+                        response.getStatus(), elapsed, AuditLogValues.clientIp());
+            } finally {
+                MDC.clear();
+            }
         }
     }
 }

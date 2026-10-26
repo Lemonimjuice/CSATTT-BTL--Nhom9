@@ -1,5 +1,7 @@
 # Comment visibility and security-denial correlation — 2026-10-27
 
+> This report describes baseline `101d4c6` (92 tests). Final hardening adds 60 regressions and verifies 152 Maven / 42 HTTP / 12 two-node cases; see [FEATURE_FREEZE.md](FEATURE_FREEZE.md) for the latest contract and results, including the corrected read-denial message.
+
 Scope: Comment `getByPost`, `getById`, `create` (including replies), and backend Request ID/access logging before Spring Security. No schema, environment variable, HTTP endpoint, root Compose, Nginx or WAF change.
 
 ## Reproduced before changing application code
