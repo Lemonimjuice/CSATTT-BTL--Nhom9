@@ -1,0 +1,6 @@
+app:
+  demo:
+    sqli:
+      jdbc-url: ${SQLI_DEMO_DB_URL}
+      username: ${SQLI_DEMO_DB_USERNAME}
+      password: ${SQLI_DEMO_DB_PASSWORD}
