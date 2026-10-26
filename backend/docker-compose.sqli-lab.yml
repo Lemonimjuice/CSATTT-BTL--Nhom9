@@ -1,0 +1,92 @@
+# Standalone disposable lab: do NOT combine with root/legacy business Compose.
+# Run with a unique Compose project and --env-file backend/.env.sqli-lab only.
+services:
+  sqli-lab-auth-db:
+    image: postgres:16-alpine
+    profiles: [sqli-lab]
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 128
+    environment:
+      POSTGRES_DB: lab_identity
+      POSTGRES_PASSWORD: ${SQLI_LAB_AUTH_ADMIN_PASSWORD:?Set a fresh lab auth admin password}
+      APP_DB_USERNAME: lab_identity_app
+      APP_DB_PASSWORD: ${SQLI_LAB_AUTH_APP_PASSWORD:?Set a fresh lab app password of at least 24 characters}
+    tmpfs:
+      - /var/lib/postgresql/data
+    volumes:
+      - ../database/init/01-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ../database/init/02-least-privilege.sql:/docker-entrypoint-initdb.d/02-least-privilege.sql:ro
+    healthcheck:
+      # TCP listener opens only after init scripts finish (init server is socket-only).
+      test: [CMD-SHELL, "pg_isready -h 127.0.0.1 -U postgres -d lab_identity"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - sqli-lab-net
+
+  sqli-lab-db:
+    image: postgres:16-alpine
+    profiles: [sqli-lab]
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 128
+    command: [postgres, -c, shared_buffers=32MB, -c, max_connections=20]
+    environment:
+      POSTGRES_DB: sqli_lab
+      POSTGRES_USER: sqli_lab_admin
+      POSTGRES_PASSWORD: ${SQLI_LAB_ADMIN_PASSWORD:?Set SQLI_LAB_ADMIN_PASSWORD in .env.sqli-lab}
+      SQLI_LAB_READER_PASSWORD: ${SQLI_LAB_READER_PASSWORD:?Set SQLI_LAB_READER_PASSWORD in .env.sqli-lab}
+    tmpfs:
+      - /var/lib/postgresql/data
+    volumes:
+      - ./docker/sqli-lab/init-demo.sh:/docker-entrypoint-initdb.d/10-init-demo.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -h 127.0.0.1 -U sqli_lab_admin -d sqli_lab"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - sqli-lab-net
+
+  sqli-lab-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: [sqli-lab]
+    mem_limit: 768m
+    cpus: 1.0
+    pids_limit: 256
+    ports:
+      - "127.0.0.1:${SQLI_LAB_HTTP_PORT:-8081}:8080"
+    environment:
+      DB_HOST: sqli-lab-auth-db
+      DB_PORT: 5432
+      DB_NAME: lab_identity
+      DB_USERNAME: lab_identity_app
+      DB_PASSWORD: ${SQLI_LAB_AUTH_APP_PASSWORD:?Set a fresh lab app password}
+      JWT_SECRET: ${SQLI_LAB_JWT_SECRET:?Set a separate base64 lab JWT key (at least 32 random bytes)}
+      SPRING_PROFILES_ACTIVE: integration,sqli-lab
+      SQLI_DEMO_ENABLED: "true"
+      SQLI_DEMO_DB_URL: jdbc:postgresql://sqli-lab-db:5432/sqli_lab
+      SQLI_DEMO_DB_USERNAME: sqli_demo_reader
+      SQLI_DEMO_DB_PASSWORD: ${SQLI_LAB_READER_PASSWORD:?Set SQLI_LAB_READER_PASSWORD in .env.sqli-lab}
+    depends_on:
+      sqli-lab-auth-db:
+        condition: service_healthy
+      sqli-lab-db:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD-SHELL, "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - sqli-lab-net
+
+networks:
+  sqli-lab-net:
+    internal: true

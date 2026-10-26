@@ -1,0 +1,31 @@
+# Maven
+target/
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.classpath
+*.project
+*.settings/
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Local credentials never belong in the Docker build context
+.env
+.env.*
+
+# Docker
+Dockerfile
+docker-compose*.yml

@@ -1,0 +1,16 @@
+# Enable only after provisioning database/init/01-schema.sql and 02-least-privilege.sql.
+# Two nodes validate the same schema; neither performs DDL at startup.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  datasource:
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 3000
+      validation-timeout: 1000
+logging:
+  level:
+    com.blogapi: INFO

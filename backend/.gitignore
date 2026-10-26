@@ -1,0 +1,7 @@
+# Backend-local exceptions to the group ignore rules.
+.env
+.env.*
+!.env.example
+!.env.sqli-lab.example
+logs/
+target/

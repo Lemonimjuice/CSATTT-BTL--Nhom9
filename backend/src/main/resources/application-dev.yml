@@ -1,0 +1,10 @@
+# Explicit opt-in for the legacy local development schema creation workflow.
+# Never activate on either integrated backend or the SQLi lab.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+logging:
+  level:
+    com.blogapi: DEBUG
