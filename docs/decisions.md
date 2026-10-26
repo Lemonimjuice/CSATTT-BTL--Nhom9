@@ -1,55 +1,69 @@
 # Quy ước kỹ thuật chung
 
-Cả nhóm đề xuất, TV1 chốt. Mỗi mục ghi trạng thái: **Đã chốt** hoặc **Đề xuất** (chờ nhóm đồng ý).
+Các quyết định đã chốt cho hệ thống. Cập nhật lần cuối: 27/10/2026.
 
-## D1. Nhánh làm việc — Đã chốt (27/10/2026)
+## D1. Nhánh làm việc
 
-- `integration/v2` là nhánh tích hợp. Mỗi thành viên làm trên nhánh riêng tách từ đó (`feat/tv1-infra`, `feat/tv2-waf`, ...) rồi mở PR vào `integration/v2`.
-- Chỉ merge `integration/v2` vào `main` khi cả 4 demo đã chạy được qua Nginx.
-- Mỗi file một người sửa (README). Cần sửa file của người khác thì báo trước.
+- `integration/v2` là nhánh tích hợp; tính năng làm trên nhánh riêng tách từ đó rồi mở PR vào `integration/v2`.
+- Chỉ merge `integration/v2` vào `main` khi `sh tests/demo/run-all.sh` đạt toàn bộ.
 
-## D2. Ghép cấu hình Nginx với ModSecurity — Đã chốt
+## D2. Nginx + ModSecurity
 
-- TV1 giữ `nginx/nginx.conf` (mount đè file của image). TV2 không viết lại file này mà chỉ:
-  - bỏ comment dòng `load_module` ở đầu file (đường dẫn module theo image TV2 chọn);
-  - bỏ comment dòng `include /etc/nginx/modsecurity/modsec-nginx.conf;` trong khối `server` HTTPS;
-  - thêm volume `./nginx/modsecurity:/etc/nginx/modsecurity:ro` cho `nginx-waf`.
-- Image TV2 chọn phải có nginx >= 1.27.3 (cấu hình dùng `resolve` trong `upstream`). Ghi rõ tag cụ thể, không dùng `latest`.
-- Khi WAF chặn: trả `403` kèm header `X-Blocked-By: waf` (theo `backend/docs/WAF_INTEGRATION.md`).
+- Image `owasp/modsecurity-crs:nginx-alpine` ghim theo digest (nginx 1.30.6, libmodsecurity 3.0.17, CRS 4.30.0).
+- Bỏ qua entrypoint sinh cấu hình từ biến môi trường của image; nhóm tự quản lý `nginx/nginx.conf` và `nginx/modsecurity/*`, để cấu hình nằm trọn trong Git và review được.
+- Image chạy nginx bằng user không đặc quyền: nghe 8080/8443 trong container, compose map ra 80/443; `cap_drop: ALL`, `no-new-privileges`.
+- WAF chặn: Nginx trả `403` JSON kèm `X-Blocked-By: waf`. Backend không bao giờ đặt header này, nên phân biệt được 403 của WAF với 403 phân quyền của backend.
 
-## D3. Đưa cụm `/api/v1/vuln` đi qua WAF — Đề xuất
+## D3. Cụm `/api/v1/vuln` đi qua WAF trong lab cô lập
 
-Hiện lab SQLi của TV3 là compose độc lập trong `backend/`, không đi qua Nginx, nên chưa chạy được Demo 2.
+- Ba service lab (`sqli-lab-api`, `sqli-lab-auth-db`, `sqli-lab-db`) nằm trong compose gốc dưới `profiles: [lab]`, chỉ nối `lab_net`.
+- Nginx định tuyến `/api/v1/vuln/` (đúng đường dẫn đề cương) và `/lab/...` tới lab API, nên mọi payload tấn công lab đều đi qua WAF.
+- Lab có DB định danh, tài khoản DB và JWT secret riêng; token stack chính dùng ở lab bị `401` và ngược lại. Lỗ hổng cố ý không chạm được dữ liệu nghiệp vụ.
 
-Đề xuất (giai đoạn 4):
-- Thêm 3 service lab (`sqli-lab-api`, `sqli-lab-auth-db`, `sqli-lab-db`) vào compose gốc dưới `profiles: [lab]`, dùng mạng riêng `lab_net` (`internal: true`).
-- `nginx-waf` nối thêm `lab_net`, thêm `location /api/v1/vuln/` trỏ tới `sqli-lab-api:8080`.
-- Lab **không** nối vào `internal_net`, không dùng chung DB, tài khoản hay JWT secret với stack chính.
+## D4. Phạm vi cặp vuln/secure
 
-## D4. Phạm vi cụm `/vuln` — Chờ nhóm quyết
+| Lỗ hổng (đề cương mục 6) | Bản lỗi (lab) | Bản vá (stack chính) |
+|---|---|---|
+| SQL Injection (nối chuỗi) | `POST /api/v1/vuln/records/search` | `POST /api/v1/secure/records/search` (JPA tham số hóa) |
+| Đọc bài nháp của người khác qua ID | `GET /api/v1/vuln/posts/{id}` | `GET /api/v1/posts/{id}` → `403` |
+| Lộ email tác giả | `GET /api/v1/vuln/posts/{id}` trả `author.email` | Mọi response bài viết/bình luận chỉ có `id, username, role` |
+| Thiếu kiểm tra quyền sở hữu (IDOR) | `PUT/DELETE /api/v1/vuln/posts/{id}` | `PUT/DELETE /api/v1/posts/{id}` → `403` |
+| Chưa đăng nhập trả 403 | — | `401` cho route cần xác thực |
 
-Đề cương (mục 5, TV3.3) nói cụm `/vuln` gồm cả lỗi đọc bài nháp, lộ email, thiếu kiểm tra quyền. Code hiện chỉ có SQLi tìm kiếm Record. Hoặc TV3 bổ sung, hoặc sửa đề cương cho khớp.
+## D5. Header, IP thật và log
 
-## D5. Header và log — Đã chốt
+- Nginx ghi đè `X-Forwarded-For`, `X-Real-IP` bằng `$remote_addr`.
+- Backend (profile `integration`) bật `forward-headers-strategy: native` nhưng chỉ tin proxy có IP khớp `TRUSTED_PROXY_REGEX` (IP cố định của `nginx-waf`). Kết nối từ nơi khác, kể cả header giả, vẫn ghi IP của socket.
+- Nginx sinh `X-Request-ID` (`$request_id`), đồng thời đặt làm transaction ID của ModSecurity (`modsecurity_transaction_id`). Một mã đối chiếu được giữa log Nginx (`rid=`), audit log WAF (`unique_id`) và log backend (`reqId=`).
+- Audit log WAF (JSON) chỉ ghi phần A, H, K, Z: không có header và body request, nên không lộ JWT, mật khẩu.
 
-- Nginx là điểm vào duy nhất nên ghi đè `X-Forwarded-For` bằng `$remote_addr` (client không chèn được IP giả).
-- Nginx sinh `X-Request-ID` (`$request_id`, 32 ký tự hex) và gửi xuống backend. Backend ghi ID này vào log, nên một request có thể đối chiếu giữa log Nginx, audit log WAF và log backend.
-- Log truy cập Nginx ghi `rid=` và `upstream=` để làm minh chứng Demo 1.
-- Header `X-Upstream` chỉ dùng cho môi trường demo (lộ IP nội bộ).
+## D6. WAF: chế độ, ngưỡng, luật tùy chỉnh
 
-## D6. Rate limiting — Đề xuất, chờ TV4 xác nhận
+- `WAF_MODE=On` mặc định; `DetectionOnly` dùng cho Demo 3 và để dò false positive.
+- Paranoia Level 1, ngưỡng anomaly 5 (một luật CRITICAL là chặn). Cho phép thêm `PUT`, `DELETE`.
+- JSON Body Inspection: luật 200001 chuyển body `application/json` sang bộ phân tích JSON; mỗi trường thành `ARGS:json.<tên>`. Body JSON hỏng bị chặn `400` (luật 200002).
+- Luật tùy chỉnh (`nginx/modsecurity/custom-rules/nhom9-custom.conf`):
+  - `100001`: bỏ `password`, `refreshToken` khỏi phạm vi quét CRS ở endpoint xác thực (tránh chặn nhầm mật khẩu có ký tự đặc biệt).
+  - `100100`: vá ảo cho `/api/v1/vuln/records/search`, `keyword` chỉ được chứa chữ, số, khoảng trắng và `. , _ -`.
+  - `100200`: `username` ở đăng nhập/đăng ký chỉ gồm `A-Z a-z 0-9 _ . @ -`.
 
-- Đăng nhập: 5 request/phút mỗi IP, burst 3 (đã kiểm: request thứ 5 liên tiếp trả `429`).
-- API chung: 5 request/giây, burst 10. Nếu Postman Runner/Burp Intruder bị `429` ở các demo không liên quan brute-force thì tăng ngưỡng hoặc giãn thời gian giữa các request.
+## D7. Rate limiting
 
-## D7. Chứng chỉ — Đã chốt
+- Đăng nhập (chính và lab dùng chung vùng): 5 request/phút mỗi IP, burst 5.
+- API chung: 5 request/giây, burst 10. Postman Runner và Burp Intruder nên đặt delay khoảng 300 ms.
 
-- Mỗi máy tự sinh bằng `sh nginx/certs/generate-cert.sh`, có SAN `DNS:localhost, IP:127.0.0.1`, hạn 365 ngày.
-- `server.key`, `server.crt` không commit (`.gitignore`). Client kiểm thử dùng `--cacert nginx/certs/server.crt` thay vì tắt xác thực.
+## D8. Load balancing và failover
 
-## D8. Khởi tạo CSDL — Đã chốt
+- Round-Robin, passive health check `max_fails=1 fail_timeout=15s`, `proxy_connect_timeout 1s`, `proxy_next_upstream error timeout http_502 http_503 http_504`.
+- `resolver 127.0.0.11 valid=5s` + `resolve`: Nginx khởi động/restart được khi một node đang tắt và tự nhận node khi nó bật lại với IP mới.
 
-- `database/init/` được mount vào `/docker-entrypoint-initdb.d/`, chạy theo thứ tự tên file: `01-schema.sql`, `02-least-privilege.sql` (TV3), `03-seed-data.sql` (TV4).
-- Script chỉ chạy khi volume trống. Sửa SQL xong phải `docker compose down -v`.
-- `.gitattributes` ép LF cho `*.sql`, `*.sh`: psql đọc sai meta-command (`\getenv`, `\if`) khi dòng kết thúc bằng CRLF.
-- Backend kết nối bằng `app_user` (không superuser, không quyền CREATE trên schema `public`); `postgres_admin` chỉ dùng cho khởi tạo.
+## D9. Chứng chỉ
+
+- Mỗi máy tự sinh bằng `sh nginx/certs/generate-cert.sh` (SAN `DNS:localhost, IP:127.0.0.1`, 365 ngày). Khóa không commit.
+
+## D10. Khởi tạo CSDL
+
+- `database/init/` mount vào `/docker-entrypoint-initdb.d/` của cả DB chính và DB định danh lab: `01-schema.sql`, `02-least-privilege.sql`, `03-seed-data.sql`.
+- Chỉ chạy khi volume trống; sửa SQL xong phải `docker compose --profile lab down -v`.
+- `.gitattributes` ép LF cho `*.sql`, `*.sh`, `*.conf`, `*.yml` (psql đọc sai meta-command khi dòng kết thúc bằng CRLF).
+- Backend kết nối bằng `app_user`: không superuser, không quyền CREATE trên schema.

@@ -1,0 +1,4 @@
+GET /api/v1/vuln/posts/3 HTTP/1.1
+Host: localhost
+Authorization: Bearer <TOKEN_LAB_USER_B>
+

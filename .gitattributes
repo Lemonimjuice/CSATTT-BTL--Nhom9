@@ -5,3 +5,5 @@
 *.conf text eol=lf
 *.yml  text eol=lf
 *.yaml text eol=lf
+# Request thô cho Burp giữ nguyên CRLF như giao thức HTTP
+*.http -text

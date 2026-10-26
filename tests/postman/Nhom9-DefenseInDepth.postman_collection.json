@@ -1,0 +1,306 @@
+{
+  "info": {
+    "name": "Nhóm 9 - Defense in Depth",
+    "description": "Bộ kiểm thử API qua Nginx + WAF (https://localhost). Chạy theo thứ tự thư mục. Cần: `docker compose --profile lab up -d`, chứng chỉ của nginx/certs/server.crt được thêm vào Postman (Settings > Certificates > CA) hoặc tắt SSL verification. Khi dùng Collection Runner, đặt Delay 300 ms để không chạm rate limit 5 request/giây của Nginx.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "postAPublic", "value": "2" },
+    { "key": "postADraft", "value": "3" },
+    { "key": "recordA", "value": "1" },
+    { "key": "recordB", "value": "3" }
+  ],
+  "item": [
+    {
+      "name": "0. Đăng nhập (lưu token)",
+      "item": [
+        {
+          "name": "Login User A (stack chính)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const j = pm.response.json();",
+            "pm.test('Có accessToken', () => pm.expect(j.accessToken).to.be.a('string'));",
+            "pm.test('Response login có email của chính mình', () => pm.expect(j.user.email).to.eql('user_a@nhom9.test'));",
+            "pm.collectionVariables.set('tokenA', j.accessToken);"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"{{userA}}\",\"password\":\"{{passA}}\"}" },
+            "url": "{{baseUrl}}/api/v1/auth/login" }
+        },
+        {
+          "name": "Login User B (stack chính)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.collectionVariables.set('tokenB', pm.response.json().accessToken);"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"{{userB}}\",\"password\":\"{{passB}}\"}" },
+            "url": "{{baseUrl}}/api/v1/auth/login" }
+        },
+        {
+          "name": "Login User A (lab)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.collectionVariables.set('labTokenA', pm.response.json().accessToken);"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"{{userA}}\",\"password\":\"{{passA}}\"}" },
+            "url": "{{baseUrl}}/lab/api/v1/auth/login" }
+        },
+        {
+          "name": "Login User B (lab)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.collectionVariables.set('labTokenB', pm.response.json().accessToken);"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"{{userB}}\",\"password\":\"{{passB}}\"}" },
+            "url": "{{baseUrl}}/lab/api/v1/auth/login" }
+        },
+        {
+          "name": "Sai mật khẩu -> 401",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"{{userA}}\",\"password\":\"sai-mat-khau\"}" },
+            "url": "{{baseUrl}}/api/v1/auth/login" }
+        }
+      ]
+    },
+    {
+      "name": "1. Hạ tầng (Nginx)",
+      "item": [
+        {
+          "name": "Health qua Nginx, có X-Request-ID và X-Upstream",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200 UP', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().status).to.eql('UP'); });",
+            "pm.test('X-Request-ID 32 hex', () => pm.expect(pm.response.headers.get('X-Request-ID')).to.match(/^[0-9a-f]{32}$/));",
+            "pm.test('Có X-Upstream', () => pm.expect(pm.response.headers.get('X-Upstream')).to.include(':8080'));"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/actuator/health" }
+        },
+        {
+          "name": "Actuator khác bị chặn tại Nginx -> 404",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('404', () => pm.response.to.have.status(404));"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/actuator/env" }
+        }
+      ]
+    },
+    {
+      "name": "2. Bài viết công khai",
+      "item": [
+        {
+          "name": "Danh sách bài PUBLISHED, author không có email",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "const posts = pm.response.json().content;",
+            "pm.test('Chỉ bài PUBLISHED', () => posts.forEach(p => pm.expect(p.status).to.eql('PUBLISHED')));",
+            "pm.test('Không lộ email tác giả', () => posts.forEach(p => pm.expect(p.author).to.not.have.property('email')));"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/posts" }
+        },
+        {
+          "name": "Sort theo thuộc tính không cho phép -> 400",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('400', () => pm.response.to.have.status(400));"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/posts?sort=author.password,asc" }
+        },
+        {
+          "name": "Ẩn danh đọc bản nháp -> 403",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403', () => pm.response.to.have.status(403));"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/posts/{{postADraft}}" }
+        }
+      ]
+    },
+    {
+      "name": "3. Demo 4 - Chống IDOR (bản vá)",
+      "item": [
+        {
+          "name": "A đọc nháp của mình -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('Là bản nháp', () => pm.expect(pm.response.json().status).to.eql('DRAFT'));"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }],
+            "url": "{{baseUrl}}/api/v1/posts/{{postADraft}}" }
+        },
+        {
+          "name": "B đọc nháp của A -> 403 (backend)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403', () => pm.response.to.have.status(403));",
+            "pm.test('Do backend chặn, không phải WAF', () => pm.expect(pm.response.headers.has('X-Blocked-By')).to.be.false);"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{tokenB}}" }],
+            "url": "{{baseUrl}}/api/v1/posts/{{postADraft}}" }
+        },
+        {
+          "name": "B sửa bài của A -> 403",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403', () => pm.response.to.have.status(403));"
+          ] } }],
+          "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{tokenB}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"title\":\"B da sua bai cua A\"}" },
+            "url": "{{baseUrl}}/api/v1/posts/{{postADraft}}" }
+        },
+        {
+          "name": "B xóa bài của A -> 403",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403', () => pm.response.to.have.status(403));"
+          ] } }],
+          "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{tokenB}}" }],
+            "url": "{{baseUrl}}/api/v1/posts/{{postADraft}}" }
+        },
+        {
+          "name": "Không token sửa bài -> 401",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('401', () => pm.response.to.have.status(401));"
+          ] } }],
+          "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"title\":\"x\"}" },
+            "url": "{{baseUrl}}/api/v1/posts/{{postADraft}}" }
+        },
+        {
+          "name": "B đọc Record của A -> 403",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403', () => pm.response.to.have.status(403));"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{tokenB}}" }],
+            "url": "{{baseUrl}}/api/v1/secure/records/{{recordA}}" }
+        }
+      ]
+    },
+    {
+      "name": "4. Record an toàn (Parameterized Query)",
+      "item": [
+        {
+          "name": "A tìm 'alpha' -> chỉ thấy Record của A",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "const r = pm.response.json();",
+            "pm.test('2 Record của A, không có Record chứa alpha của B', () => { pm.expect(r.length).to.eql(2); r.forEach(x => pm.expect(x.content).to.not.include('User B')); });"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"keyword\":\"alpha\"}" },
+            "url": "{{baseUrl}}/api/v1/secure/records/search" }
+        },
+        {
+          "name": "A tạo Record -> 201",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201', () => pm.response.to.have.status(201));"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"content\":\"Record tao tu Postman\"}" },
+            "url": "{{baseUrl}}/api/v1/secure/records" }
+        },
+        {
+          "name": "Không token -> 401",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('401', () => pm.response.to.have.status(401));"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"keyword\":\"alpha\"}" },
+            "url": "{{baseUrl}}/api/v1/secure/records/search" }
+        }
+      ]
+    },
+    {
+      "name": "5. Demo 2 - WAF chặn tấn công (WAF_MODE=On)",
+      "item": [
+        {
+          "name": "SQLi vào cụm lỗi /vuln -> 403 WAF (vá ảo 100100)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403', () => pm.response.to.have.status(403));",
+            "pm.test('X-Blocked-By: waf', () => pm.expect(pm.response.headers.get('X-Blocked-By')).to.eql('waf'));",
+            "console.log('Tra audit log: sh scripts/waf-audit.sh ' + pm.response.headers.get('X-Request-ID'));"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{labTokenA}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"keyword\":\"' OR '1'='1\"}" },
+            "url": "{{baseUrl}}/api/v1/vuln/records/search" }
+        },
+        {
+          "name": "SQLi vào route secure -> 403 WAF (OWASP CRS)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403 do WAF', () => { pm.response.to.have.status(403); pm.expect(pm.response.headers.get('X-Blocked-By')).to.eql('waf'); });"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"keyword\":\"' OR '1'='1\"}" },
+            "url": "{{baseUrl}}/api/v1/secure/records/search" }
+        },
+        {
+          "name": "XSS trong query string -> 403 WAF",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403 do WAF', () => { pm.response.to.have.status(403); pm.expect(pm.response.headers.get('X-Blocked-By')).to.eql('waf'); });"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/posts/search?q=<script>alert(1)</script>" }
+        },
+        {
+          "name": "SQLi trong username đăng nhập -> 403 WAF (custom rule 100200)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('403 do WAF', () => { pm.response.to.have.status(403); pm.expect(pm.response.headers.get('X-Blocked-By')).to.eql('waf'); });"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"username\":\"admin' --\",\"password\":\"x\"}" },
+            "url": "{{baseUrl}}/api/v1/auth/login" }
+        },
+        {
+          "name": "Nội dung hợp lệ có dấu nháy không bị chặn nhầm -> 201",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201', () => pm.response.to.have.status(201));"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"title\":\"It's a test\",\"content\":\"Don't panic, it's fine.\",\"status\":\"DRAFT\"}" },
+            "url": "{{baseUrl}}/api/v1/posts" }
+        }
+      ]
+    },
+    {
+      "name": "6. Đối chứng - cụm API lỗi trong lab",
+      "item": [
+        {
+          "name": "Tìm kiếm bình thường trong lab -> 1 dòng",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200, 1 dòng', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().length).to.eql(1); });"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{labTokenA}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"keyword\":\"alpha\"}" },
+            "url": "{{baseUrl}}/api/v1/vuln/records/search" }
+        },
+        {
+          "name": "Token stack chính dùng ở lab -> 401",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('401', () => pm.response.to.have.status(401));"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"keyword\":\"alpha\"}" },
+            "url": "{{baseUrl}}/api/v1/vuln/records/search" }
+        },
+        {
+          "name": "Bản lỗi: B đọc nháp của A, thấy email -> 200",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "const j = pm.response.json();",
+            "pm.test('Đọc được bản nháp', () => pm.expect(j.status).to.eql('DRAFT'));",
+            "pm.test('Lộ email tác giả', () => pm.expect(j.author.email).to.eql('user_a@nhom9.test'));"
+          ] } }],
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{labTokenB}}" }],
+            "url": "{{baseUrl}}/api/v1/vuln/posts/{{postADraft}}" }
+        },
+        {
+          "name": "Bản lỗi: B sửa bài của A -> 200 (IDOR)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));"
+          ] } }],
+          "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{labTokenB}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"title\":\"B da sua bai cua A\"}" },
+            "url": "{{baseUrl}}/api/v1/vuln/posts/{{postADraft}}" }
+        }
+      ]
+    }
+  ]
+}

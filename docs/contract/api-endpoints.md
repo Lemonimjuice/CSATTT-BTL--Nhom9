@@ -27,3 +27,23 @@ Detailed standalone request/response and WAF notes: `backend/docs/BACKEND_HANDOV
 - JWT key variables retain their names and Base64 contract; startup now requires at least 32 decoded bytes with no raw-key fallback. Backend audit uses the direct peer IP; forwarded IP headers are not trusted.
 
 Latest verified result: 152 Maven / 42 HTTP secure-lab / 12 two-node PASS, 0 Maven failures/errors/skips. Details and limits: [Feature Freeze hardening](../../backend/docs/FEATURE_FREEZE.md).
+
+## Tích hợp nhóm qua Nginx + WAF (27/10/2026)
+
+Truy cập qua `https://localhost` (Nginx + ModSecurity); backend không publish cổng ra host.
+
+**Cụm API lỗi bổ sung trong lab** (`VulnerablePostController`, cùng điều kiện với SQLi lab: profile `sqli-lab` và `SQLI_DEMO_ENABLED=true`, chỉ tồn tại trong `sqli-lab-api`):
+
+| Method and path | Lỗi cố ý | Bản vá tương ứng trên stack chính |
+|---|---|---|
+| `GET /api/v1/vuln/posts/{id}` | Đọc mọi bài kể cả DRAFT/ARCHIVED; trả `author.email` | `GET /api/v1/posts/{id}`: nháp của người khác `403`, author không có email |
+| `PUT /api/v1/vuln/posts/{id}` | Không kiểm tra chủ sở hữu (IDOR); body `{ "title", "content" }` | `PUT /api/v1/posts/{id}`: người khác `403` |
+| `DELETE /api/v1/vuln/posts/{id}` | Không kiểm tra chủ sở hữu (IDOR) | `DELETE /api/v1/posts/{id}`: người khác `403` |
+
+Các route này vẫn yêu cầu JWT của lab (`401` nếu thiếu hoặc dùng token stack chính).
+
+**Đường dẫn qua Nginx:** stack chính giữ nguyên đường dẫn. Lab: `/api/v1/vuln/...` giữ nguyên; các route khác của lab dùng tiền tố `/lab`, ví dụ đăng nhập lab là `POST /lab/api/v1/auth/login`.
+
+**IP trong audit log:** profile `integration` bật `server.forward-headers-strategy: native` và chỉ tin `X-Forwarded-For` khi kết nối đến từ IP khớp `TRUSTED_PROXY_REGEX` (IP cố định của `nginx-waf`, Nginx đã ghi đè header này bằng IP thật). Mặc định (không có biến) không tin proxy nào, giữ hành vi của bản hardening. `ip=` trong log backend vì vậy là IP client thật khi đi qua Nginx.
+
+**Phân biệt 403:** WAF chặn trả `{"status":403,"message":"Request blocked by WAF","requestId":...}` kèm header `X-Blocked-By: waf`; 403 phân quyền của backend không có header này.

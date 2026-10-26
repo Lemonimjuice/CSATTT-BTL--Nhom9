@@ -1,5 +1,13 @@
 # Enable only after provisioning database/init/01-schema.sql and 02-least-privilege.sql.
 # Two nodes validate the same schema; neither performs DDL at startup.
+server:
+  # Only the group Nginx (fixed IP on the internal network, TRUSTED_PROXY_REGEX) may set the
+  # client address via X-Forwarded-For; Nginx overwrites that header with $remote_addr.
+  # Any other peer, including a client sending forged headers directly, keeps its socket address.
+  forward-headers-strategy: native
+  tomcat:
+    remoteip:
+      internal-proxies: ${TRUSTED_PROXY_REGEX:^$}
 spring:
   jpa:
     hibernate:
