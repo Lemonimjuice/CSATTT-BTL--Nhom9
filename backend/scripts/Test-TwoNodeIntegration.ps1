@@ -5,6 +5,7 @@ param([string]$LabBaseUrl)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Http-Response.ps1')
+. (Join-Path $PSScriptRoot 'Docker-Loopback.ps1')
 
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $sqlRoot = (Resolve-Path (Join-Path $projectRoot '../database/init')).Path
@@ -70,10 +71,8 @@ function Confirm-NameFree([string[]]$dockerArgs, [string]$name) {
 }
 
 function Get-LocalBaseUrl([string]$container) {
-    $mapping = Invoke-Docker @('port', $container, '8080/tcp') "Reading localhost port for $container"
-    $line = @($mapping -split "`r?`n" | Where-Object { $_ -match '^127\.0\.0\.1:\d+$' })
-    if ($line.Count -ne 1) { throw "Expected exactly one IPv4 localhost port for $container." }
-    return 'http://' + $line[0]
+    $bindingJson = Invoke-Docker @('inspect', '--format', '{{json (index .NetworkSettings.Ports "8080/tcp")}}', $container) "Reading Engine port binding for $container"
+    return Get-DockerLoopbackUrl $bindingJson
 }
 
 function Call-Api([string]$case, [string]$baseUrl, [string]$method,

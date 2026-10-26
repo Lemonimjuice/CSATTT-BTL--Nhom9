@@ -11,7 +11,7 @@ Authoritative fresh-database scripts: `database/init/01-schema.sql` followed by 
 | `refresh_tokens` | `id` bigint identity; unique token, unique `user_id -> users`, expiration |
 | `secure_records` | `id` bigint identity; content, `owner_id -> users` |
 
-The scripts were tested on temporary PostgreSQL 16: both executed, all six tables appeared, and the application role passed privilege checks. Hibernate with profile `integration` and `ddl-auto=validate` started successfully on a separate temporary PostgreSQL 16 test, as reported by the operator. These checks were not rerun in the group repository.
+The final group-repository Docker E2E run on 2026-10-27 applied both scripts to fresh temporary PostgreSQL 16. Both backend nodes started with profile `integration` and `ddl-auto=validate`, using the generated application role; cross-node Record create/read and ownership tests passed. The separate SQLi lab's PostgreSQL fixture/privilege tests also passed as part of the 39-test Maven suite, with no failures/errors/skips. These are disposable-database results, not evidence that the existing business volume was migrated. See [V2 handover](tv3-v2-handover.md).
 
 `02-least-privilege.sql` reads `APP_DB_USERNAME` and `APP_DB_PASSWORD` from the PostgreSQL process environment. It creates a non-admin login role, grants CONNECT and schema USAGE, scoped table DML and identity-sequence USAGE. It does not grant schema creation or ownership. The Backend uses `DB_USERNAME` and `DB_PASSWORD` for that same role.
 

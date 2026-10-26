@@ -1,19 +1,19 @@
-> **Cập nhật V2 27/10/2026:** xem [hợp đồng hiện hành](../../docs/contract/tv3-v2-handover.md). WAF/ModSecurity chưa được kiểm chứng. Lab Compose chạy độc lập, dùng identity DB và JWT riêng; phải login riêng ở lab. Port 8081 là mặc định local, host runner dùng port ngẫu nhiên. Không dùng hướng dẫn Compose/token dùng chung của standalone cũ.
+> **Cập nhật V2 27/10/2026:** xem [hợp đồng hiện hành](../../docs/contract/tv3-v2-handover.md). Backend Docker E2E đã PASS; WAF/ModSecurity vẫn NOT RUN. Lab dùng identity DB/JWT riêng. Runner dùng plain HTTP gateway test, bỏ publish trực tiếp từ API và cấp port loopback ngẫu nhiên; gateway này không có WAF và không thay gateway TV1/TV2.
 
 # Backend / ModSecurity integration contract
 
-Tài liệu cho lab BTL Defense in Depth. Các ví dụ dùng dữ liệu giả, JWT của tài khoản thử nghiệm và HTTP local. ModSecurity/Nginx chưa được triển khai trong repository này; kết quả WAF bên dưới là tiêu chí cần kiểm chứng sau tích hợp.
+Tài liệu cho lab BTL Defense in Depth. Các ví dụ dùng dữ liệu giả, JWT của tài khoản thử nghiệm và HTTP local. ModSecurity/CRS và Nginx LB chưa được kiểm chứng với backend thật; kết quả WAF bên dưới là tiêu chí cần kiểm chứng sau tích hợp.
 
 ## 1. Luồng request và ranh giới dữ liệu
 
 ```text
 Client -> Nginx/WAF (TV1/TV2) -> main Spring nodes -> DB nghiệp vụ
-Client local -> lab Spring (JWT riêng) -> identity DB tạm
-                                      -> fixture DB tạm (JDBC reader riêng)
+Client loopback -> HTTP test gateway -> lab Spring (JWT riêng) -> identity DB tạm
+                                                             -> fixture DB tạm (JDBC reader riêng)
 ```
 
 - Backend thường: `http://127.0.0.1:8080`; vulnerable route mặc định không tồn tại.
-- Backend lab tùy chọn: `http://127.0.0.1:8081`; chỉ bind loopback, profile `sqli-lab` và flag bật tường minh. Không public port này ra Internet/tunnel.
+- HTTP lab trong runner: URL `http://127.0.0.1:<random>` được in sau khi xác minh active binding của gateway. Test override bỏ port API; API/DB chỉ ở internal network. Port 8081 trong base Compose không phải URL tái hiện runner. Profile `sqli-lab` và flag bật tường minh; không public lab ra Internet/tunnel.
 - Lab database nằm trong container riêng, không publish cổng PostgreSQL; tài khoản truy vấn chỉ SELECT bảng `demo.records`. JDBC lab không dùng tài khoản/datasource nghiệp vụ.
 - Toàn bộ lab API cũng không nhận credentials hoặc network nghiệp vụ: JPA/JWT user lookup dùng `sqli-lab-auth-db`, identity giả và key riêng. Token main/lab phải bị từ chối khi dùng chéo. TV1/TV2 cần chốt proxy lab riêng mà không nối lab API vào network chứa DB nghiệp vụ.
 - WAF là lớp thêm vào. Secure search luôn phải giữ parameter binding và ownership khi WAF bị bypass hoặc tắt.
@@ -119,6 +119,6 @@ Không dùng riêng HTTP `403`, hình dạng body hoặc sự hiện diện `X-R
 
 ## 7. Trạng thái kiểm chứng
 
-Lịch sử standalone ngày 26/10/2026 báo 27 Maven tests và 26 HTTP cases PASS. Đó là topology cũ có primary datasource nghiệp vụ trong lab API, không chứng minh runtime đã tách business DB ở V2. Kết quả phiên hiện tại và các mục NOT RUN được ghi riêng trong [hợp đồng V2](../../docs/contract/tv3-v2-handover.md).
+Docker E2E source nhóm ngày 27/10/2026 kết thúc với exit code 0: Maven 39/39, HTTP secure/lab 30/30 và two-node HTTP 12/12 PASS. Lab HTTP qua gateway loopback, identity/DB/JWT separation, network isolation và cleanup đã chạy thật và PASS. Normal alpha trả 1 fixture; Boolean SQLi trả 3 fixture qua gateway, minh chứng gateway test không chặn payload. Chi tiết tại [hợp đồng V2](../../docs/contract/tv3-v2-handover.md) và [gateway test](SQLI_TEST_GATEWAY.md).
 
 Chưa có bằng chứng ModSecurity/CRS end-to-end trong repository này. Các expected WAF `403` ở mục 4–5 vẫn là tiêu chí tích hợp, không phải kết quả đã chạy.
