@@ -57,7 +57,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
             }
         } catch (Exception ex) {
-            log.warn("JWT authentication failed: {}", ex.getMessage());
+            // Parser exception messages may embed the submitted JWT or its claims.
+            log.warn("JWT authentication failed");
         }
 
         filterChain.doFilter(request, response);

@@ -1,8 +1,10 @@
 # Run manually from Windows PowerShell 5.1+ with Docker Desktop available.
 # Only localhost HTTP ports for disposable backends are published. PostgreSQL
 # stays inside a dedicated network and uses tmpfs rather than a Docker volume.
+param([string]$LabBaseUrl)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Http-Response.ps1')
 
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $sqlRoot = (Resolve-Path (Join-Path $projectRoot '../database/init')).Path
@@ -92,7 +94,7 @@ function Call-Api([string]$case, [string]$baseUrl, [string]$method,
     try {
         $response = Invoke-WebRequest @parameters
         $status = [int]$response.StatusCode
-        $content = $response.Content
+        $content = ConvertTo-HttpText $response.Content
     }
     catch {
         $httpResponse = $_.Exception.Response
@@ -107,25 +109,27 @@ function Call-Api([string]$case, [string]$baseUrl, [string]$method,
     return [pscustomobject]@{ Status = $status; Content = $content }
 }
 
-function Parse-ApiJson([string]$case, [string]$content) {
-    try { return ($content | ConvertFrom-Json) }
+function Parse-ApiJson([string]$case, $content) {
+    try { return ((ConvertTo-HttpText $content) | ConvertFrom-Json) }
     catch { throw "$case returned malformed JSON (body omitted)." }
 }
 
 function Wait-Healthy([string]$baseUrl, [string]$nodeLabel) {
+    $lastStatus = 'no HTTP response'
     for ($attempt = 1; $attempt -le 120; $attempt++) {
         try {
             $response = Invoke-WebRequest -Uri ($baseUrl + '/actuator/health') -UseBasicParsing -TimeoutSec 3
+            $lastStatus = 'HTTP ' + [int]$response.StatusCode + '; content type ' + $response.Content.GetType().Name
             if ([int]$response.StatusCode -eq 200 -and
-                ($response.Content -match '"status"\s*:\s*"UP"')) {
+                ((ConvertTo-HttpText $response.Content) -match '"status"\s*:\s*"UP"')) {
                 Write-Result "PASS: $nodeLabel health UP."
                 return
             }
         }
-        catch { } # Startup polling; diagnostics are logged on timeout.
+        catch { $lastStatus = 'exception type ' + $_.Exception.GetType().Name }
         Start-Sleep -Seconds 1
     }
-    throw "$nodeLabel did not become healthy within 120 seconds."
+    throw "$nodeLabel did not become healthy within 120 seconds ($lastStatus; body omitted)."
 }
 
 function Write-SafeStartupDiagnostics([string]$container) {
@@ -244,6 +248,9 @@ try {
     $base2 = Get-LocalBaseUrl $node2
     Wait-Healthy $base1 'Node 1'
     Wait-Healthy $base2 'Node 2'
+    if ($LabBaseUrl) {
+        & (Join-Path $PSScriptRoot 'Test-SqliE2E.ps1') -BaseUrl $base1 -LabBaseUrl $LabBaseUrl
+    }
 
     $usernameA = 'nodea' + $suffix
     $usernameB = 'nodeb' + $suffix
@@ -281,6 +288,16 @@ try {
     }
     Write-Result 'PASS: Node 1 and Node 2 share the test PostgreSQL Record data.'
     $null = Call-Api 'other owner denied by Node 2' $base2 'GET' $recordPath $null $tokenB 403
+    $null = Call-Api 'JWT from Node 2 accepted by Node 1; other owner denied' $base1 'GET' $recordPath $null $tokenB 403
+    $reverse = Call-Api 'create Record on Node 2 with Node 1 JWT' $base2 'POST' '/api/v1/secure/records' @{
+        content = $recordContent
+    } $tokenA 201
+    $reverseId = (Parse-ApiJson 'Node 2 Record creation' $reverse.Content).id
+    if (-not $reverseId) { throw 'Node 2 creation did not return a Record ID.' }
+    $reverseRead = Call-Api 'read Node 2 Record on Node 1' $base1 'GET' ('/api/v1/secure/records/' + $reverseId) $null $tokenA 200
+    if ((Parse-ApiJson 'Node 1 reverse Record read' $reverseRead.Content).content -ne $recordContent) {
+        throw 'Node 1 did not return the Record created on Node 2.'
+    }
 
     # Controlled stop is restricted to this run's labeled Node 1 container.
     $node1Marker = Invoke-Docker @('container', 'inspect', '--format',
@@ -300,6 +317,7 @@ try {
         throw 'Node 2 returned different Record content after Node 1 stopped.'
     }
     Write-Result 'PASS: cross-instance JWT, shared Record, ownership 403, and Node 2 readiness after Node 1 stop.'
+    Write-Result 'Scope: direct backend node survival only; Nginx load balancing/failover is NOT tested.'
 }
 catch {
     $failure = $_.Exception.Message

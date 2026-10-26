@@ -15,6 +15,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Component
 @Order(1)
@@ -22,6 +23,7 @@ import java.util.UUID;
 public class MdcLoggingFilter extends OncePerRequestFilter {
 
     private static final String REQUEST_ID_HEADER = "X-Request-ID";
+    private static final Pattern SAFE_REQUEST_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,63}");
     private static final String MDC_REQUEST_ID    = "requestId";
     private static final String MDC_USER_ID       = "userId";
     private static final String MDC_METHOD        = "method";
@@ -35,8 +37,8 @@ public class MdcLoggingFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
 
         String requestId = request.getHeader(REQUEST_ID_HEADER);
-        if (requestId == null || requestId.isBlank()) {
-            requestId = UUID.randomUUID().toString().substring(0, 8);
+        if (requestId == null || !SAFE_REQUEST_ID.matcher(requestId).matches()) {
+            requestId = UUID.randomUUID().toString();
         }
 
         MDC.put(MDC_REQUEST_ID, requestId);

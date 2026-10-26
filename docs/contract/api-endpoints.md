@@ -14,4 +14,6 @@ Container port: 8080. JSON requests use `Content-Type: application/json`. Protec
 
 Missing or invalid JWT on protected Record endpoints returns `401`. Record owner is taken from the authenticated principal; clients cannot choose it. Secure search uses JPA parameter binding. Vulnerable search must remain off on the main backend.
 
+V2: lab identities and JWT key are separate from the main backend. Register/login at the lab URL to obtain a lab token; main/lab JWTs must return `401` when used across these two environments. This differs from the two **main** nodes, which must share the same JWT secret. `X-Request-ID` accepts 1–64 ASCII letters/digits/dot/underscore/hyphen, starting with a letter/digit; other inputs are replaced with a UUID. See [current V2 handover](tv3-v2-handover.md) for configuration, evidence and TV1/TV2 responsibilities.
+
 Detailed standalone request/response and WAF notes: `backend/docs/BACKEND_HANDOVER.md` and `backend/docs/WAF_INTEGRATION.md`. Group Nginx/WAF behavior has not been tested with these files.

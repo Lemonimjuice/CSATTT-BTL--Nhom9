@@ -13,8 +13,8 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: validate
+    show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -53,7 +53,7 @@ management:
 logging:
   level:
     root: INFO
-    com.blogapi: DEBUG
+    com.blogapi: INFO
     org.springframework.security: INFO
     org.hibernate.SQL: WARN
   pattern:

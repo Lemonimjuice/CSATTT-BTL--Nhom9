@@ -1,31 +1,27 @@
-# TV3 Backend Security handover
+# TV3 backend — bàn giao V2 (27/10/2026)
 
-Spring Boot Blog API (DevFinesse base), Java 21 / Spring Boot 3.2.5 / Maven. Build context is this `backend/` directory: `docker build -f backend/Dockerfile backend` from the group root.
+Tài liệu hiện hành: [hợp đồng tích hợp V2](../../docs/contract/tv3-v2-handover.md). Phạm vi sửa là backend và hợp đồng TV3; root Compose/Nginx/WAF do TV1/TV2 quản lý.
 
-## Scope and verified status
+## Backend chính
 
-- Code includes JWT/BCrypt authentication, Record create/read/search with ownership, and an opt-in SQLi comparison lab. The normal backend keeps the vulnerable endpoint disabled.
-- The source backend previously reported 27 Maven tests and 26 HTTP E2E cases passing; these were not rerun during this copy.
-- TV3's temporary PostgreSQL 16 check of `database/init/01-schema.sql` and `02-least-privilege.sql` passed, including six tables and application privileges. Hibernate startup with profile `integration` and `ddl-auto=validate` also passed on a temporary PostgreSQL 16 instance, as reported by the operator.
-- `scripts/Test-TwoNodeIntegration.ps1` is prepared and PowerShell syntax checked, but **has not been executed**. JWT cross-instance, shared Record, ownership across nodes, and node-stop readiness are not yet runtime verified in the group repository.
-- The group Compose, Nginx, ModSecurity, WAF routing, and SQLi lab integration are not yet verified with this backend.
+Java 21, Spring Boot 3.2.5, PostgreSQL 16. Build context là `backend/`. Hai node phải dùng cùng image ID, cùng DB và cùng JWT secret Base64 tối thiểu 32 byte ngẫu nhiên. Container nghe cổng 8080; health public `GET /actuator/health`.
 
-## Group integration contract
+Cấu hình mặc định và profile `integration` dùng `ddl-auto: validate`, `show-sql: false`. Dùng role ứng dụng theo `database/init/02-least-privilege.sql`, không dùng provisioning owner. Khởi tạo schema trước khi chạy. Profile `dev` khôi phục auto-DDL `update`/show SQL của workflow phát triển cũ, chỉ opt-in local. Maven tests tự override H2/create-drop nên không phụ thuộc auto-DDL mặc định. Không có `application-prod.yml`; `prod` chỉ có nhánh logging trong `logback-spring.xml`, không bảo đảm validate hay least privilege.
 
-- TV1 owns root `docker-compose.yml` and `nginx/`; both still use HTTP Echo nodes. Replace those nodes with the same image built from `backend/`, expose container port 8080 internally, and use the same `JWT_SECRET`, `DB_HOST=database`, `DB_PORT=5432`, `DB_NAME=blogdb`, `DB_USERNAME`, and `DB_PASSWORD` on both nodes.
-- Use `SPRING_PROFILES_ACTIVE=integration`. Its Hibernate mode is `validate`; schema must exist before either node starts. The application DB role needs the rights granted by `database/init/02-least-privilege.sql` and must not own the schema.
-- On a **fresh disposable database only**, apply `database/init/01-schema.sql` then `02-least-privilege.sql` with `APP_DB_USERNAME` and `APP_DB_PASSWORD`. Do not run these scripts on the current business volume or use `docker compose down -v`.
-- The root Compose does not yet mount these scripts or supply the application role/environment. TV1 must integrate these values without placing real credentials in Git. Its current `DB_ADMIN_PASSWORD` fallback should be removed before a shared demo.
-- `.env.example` and `.env.sqli-lab.example` here contain placeholders only. They are examples for the older standalone backend setup, not a replacement for TV1's root `.env.example`.
+TV1 phải thay hai HTTP Echo bằng image backend, đặt `DB_HOST=database` theo service thật của root Compose, `DB_PORT=5432`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `SPRING_PROFILES_ACTIVE=integration`, `SQLI_DEMO_ENABLED=false`. Không dùng tên `postgres` của standalone cũ. Chỉ provision hai SQL init trên DB mới, không chạy trên volume nghiệp vụ hiện hữu.
 
-## SQLi lab boundary
+## Lab SQLi
 
-`docker-compose.sqli-lab.yml` and `docker/sqli-lab/init-demo.sh` are retained as **standalone reference assets**. The overlay names old services `postgres` and `blog-net`, so it must not be applied to the group's root Compose unchanged. TV1/TV2 must route a separate lab container/database and preserve the lab reader's SELECT-only rights and default-off flag. The lab API's primary datasource still uses business DB authentication; do not describe it as fully independent of business identity data.
+`backend/docker-compose.sqli-lab.yml` hiện là Compose **độc lập**, không ghép root/standalone Compose. Ba service: API, PostgreSQL identity tạm và PostgreSQL fixture. API không nhận credentials DB nghiệp vụ, chỉ nối một network `internal`; API publish loopback, hai DB không publish cổng và dùng tmpfs. Auth/JPA dùng schema TV3 ở DB identity tạm với role least privilege; vulnerable JDBC dùng reader riêng chỉ SELECT ba fixture `LAB-ONLY`. Không thay Auth để bỏ lookup user.
 
-## Documents and scripts
+JWT lab dùng `SQLI_LAB_JWT_SECRET` độc lập. Tài khoản/token nghiệp vụ không dùng cho lab. Đăng ký/login lại ở lab; chỉ tạo dữ liệu giả. Reader/startup checks, timeout và cấm stacked statements vẫn giữ. Tham số của secure search vẫn bind; không bật flag/profile lab trên backend chính.
 
-- `docs/BACKEND_HANDOVER.md` and `docs/WAF_INTEGRATION.md` preserve prior standalone contracts and evidence. Their old Compose commands are not group deployment instructions.
-- `scripts/Test-DatabaseInit.ps1` and `scripts/Test-HibernateValidation.ps1` target `../database/init/` and create disposable resources; the latter is copied from the operator's fixed script.
-- `scripts/Test-TwoNodeIntegration.ps1` targets `../database/init/`; it builds a test image, starts two localhost-bound backends and a non-published temporary PostgreSQL, then cleans up owned resources. Run it separately before claiming the two-node demo works.
-- `scripts/Test-SqliE2E.ps1` checks HTTP contracts against explicit local URLs. `scripts/Test-BackendTests.ps1` can run default Maven tests; its `-WithLab` mode still assumes the standalone Compose and must be adapted before group use.
-- Endpoint summary: `../docs/contract/api-endpoints.md`; schema/privileges: `../docs/contract/db-schema.md`.
+Mẫu biến lab trong `.env.sqli-lab.example`; không copy credentials từ `.env` standalone. Compose path tương đối đã trỏ tới init SQL của repo nhóm. Không tuyên bố runtime cô lập đạt chỉ từ config: cần chạy host runner để kiểm chứng network, datasource, JWT tách biệt và quyền PostgreSQL. Network nội bộ không phải sandbox chống Docker administrator/host compromise.
+
+## Kiểm thử
+
+`Test-HttpResponse.ps1`: regression mock string/byte[] cho health, response và JSON; không Docker.
+`Test-V2Contract.ps1`: Compose schema và effective config, không cần Engine; chỉ dùng template placeholders, không in config/secret.
+`Test-V2Host.ps1`: PowerShell 7 + Docker Desktop Linux Engine. Tự sinh project/image/container names và secrets tạm, build code hiện tại, chạy Maven có PostgreSQL lab opt-in, HTTP secure/lab E2E, JWT/Record dùng chéo node, ownership 403, stop node1 rồi đọc node2. Chỉ cleanup tài nguyên thử nghiệm do chính script tạo, không persistent volume. Host cần Internet ở lần build đầu. Script không chứng minh Nginx LB/failover hay ModSecurity/CRS.
+
+Lệnh duy nhất để chạy phần Docker còn thiếu nằm trong hợp đồng V2. Các kết quả cũ 27 Maven/26 HTTP/SQL init/Hibernate validate là lịch sử standalone; không phải bằng chứng phiên hiện tại.

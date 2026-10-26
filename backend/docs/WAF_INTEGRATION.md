@@ -1,4 +1,4 @@
-> **Repository nhóm:** endpoint và payload bên dưới là contract TV3; WAF/ModSecurity chưa được tích hợp hoặc kiểm chứng trong repo nhóm. Các URL 127.0.0.1 là từ môi trường backend standalone. Xem `backend/README.md`.
+> **Cập nhật V2 27/10/2026:** xem [hợp đồng hiện hành](../../docs/contract/tv3-v2-handover.md). WAF/ModSecurity chưa được kiểm chứng. Lab Compose chạy độc lập, dùng identity DB và JWT riêng; phải login riêng ở lab. Port 8081 là mặc định local, host runner dùng port ngẫu nhiên. Không dùng hướng dẫn Compose/token dùng chung của standalone cũ.
 
 # Backend / ModSecurity integration contract
 
@@ -7,14 +7,15 @@ Tài liệu cho lab BTL Defense in Depth. Các ví dụ dùng dữ liệu giả,
 ## 1. Luồng request và ranh giới dữ liệu
 
 ```text
-Client lab -> Nginx + ModSecurity + OWASP CRS -> Spring Boot
-                                                |-- JWT + ownership + JPA -> PostgreSQL nghiệp vụ
-                                                `-- JDBC reader riêng -> PostgreSQL lab (dữ liệu giả)
+Client -> Nginx/WAF (TV1/TV2) -> main Spring nodes -> DB nghiệp vụ
+Client local -> lab Spring (JWT riêng) -> identity DB tạm
+                                      -> fixture DB tạm (JDBC reader riêng)
 ```
 
 - Backend thường: `http://127.0.0.1:8080`; vulnerable route mặc định không tồn tại.
 - Backend lab tùy chọn: `http://127.0.0.1:8081`; chỉ bind loopback, profile `sqli-lab` và flag bật tường minh. Không public port này ra Internet/tunnel.
 - Lab database nằm trong container riêng, không publish cổng PostgreSQL; tài khoản truy vấn chỉ SELECT bảng `demo.records`. JDBC lab không dùng tài khoản/datasource nghiệp vụ.
+- Toàn bộ lab API cũng không nhận credentials hoặc network nghiệp vụ: JPA/JWT user lookup dùng `sqli-lab-auth-db`, identity giả và key riêng. Token main/lab phải bị từ chối khi dùng chéo. TV1/TV2 cần chốt proxy lab riêng mà không nối lab API vào network chứa DB nghiệp vụ.
 - WAF là lớp thêm vào. Secure search luôn phải giữ parameter binding và ownership khi WAF bị bypass hoặc tắt.
 - Khi tích hợp, Docker/Nginx cần chặn truy cập backend trực tiếp từ bên ngoài và giữ lab trong mạng máy demo. Việc thay đổi cổng/firewall/Nginx phải được nhóm thống nhất.
 
@@ -92,7 +93,7 @@ Thành viên WAF cần cấu hình JSON request-body inspection cho hai route PO
 1. Chốt phiên bản ModSecurity/connector/CRS, anomaly threshold, paranoia level và body-size limit; ghi vào cấu hình tích hợp.
 2. Chạy `DetectionOnly` local để xác nhận parser/rule hit với payload; sau đó chuyển `On` cho phần demo chặn.
 3. Khi WAF chặn, trả HTTP `403` kèm response header `X-Blocked-By: waf`; backend không tự thêm header này. Ghi CRS rule ID, transaction ID, timestamp và request ID vào audit log.
-4. Nginx sinh request ID và chuyển `X-Request-ID` tới backend. Không tin response header giả do client đưa vào; Nginx phải sở hữu marker WAF.
+4. Nginx sinh request ID và chuyển `X-Request-ID` tới backend. Backend chỉ giữ ID 1–64 ký tự `[A-Za-z0-9][A-Za-z0-9._-]*`, input khác được thay UUID. Không tin response header giả do client đưa vào; Nginx phải sở hữu marker WAF.
 5. Che Authorization, password, refresh token và dữ liệu Record trong log chia sẻ; không log nguyên toàn bộ request/response auth.
 
 Không dùng riêng HTTP `403`, hình dạng body hoặc sự hiện diện `X-Request-ID` để kết luận nguồn chặn. Backend ownership cũng trả `403`. `MdcLoggingFilter` có trả `X-Request-ID` và log method/path/status khi request đi tới filter; request bị SecurityFilterChain chặn sớm có thể không có log này. Bằng chứng WAF gồm marker do Nginx tạo **và** CRS audit tương ứng; request bị WAF chặn không tới handler search của backend.
@@ -118,8 +119,6 @@ Không dùng riêng HTTP `403`, hình dạng body hoặc sự hiện diện `X-R
 
 ## 7. Trạng thái kiểm chứng
 
-Đã chạy Maven trong Docker với PostgreSQL lab opt-in: **27 tests, 0 failures, 0 errors, 0 skipped**. Bao gồm kiểm tra reader SELECT-only/read-only, normal 1 dòng so với Boolean SQLi 3 dòng giả, không đọc được bảng nghiệp vụ/`pg_authid`, stacked statements bị từ chối và timeout truy vấn. Compose config đã qua kiểm tra; overlay không đổi cấu hình hiệu lực của `postgres`/`blog-api` hiện tại.
-
-Build image backend chính và lab API đã thành công. Script HTTP trên PostgreSQL thật đạt **26 cases**, gồm auth/ownership, secure search giữ owner scope, Boolean payload trả `200 []`, main vulnerable route `404`, lab normal 1 dòng/Boolean 3 dòng giả, đọc bảng thật/credential catalog bị từ chối `400`. PostgreSQL nghiệp vụ giữ nguyên ID/StartedAt; snapshot sau test cả hai API/hai PostgreSQL healthy. Chi tiết và lệnh tái hiện ở `BACKEND_HANDOVER.md`.
+Lịch sử standalone ngày 26/10/2026 báo 27 Maven tests và 26 HTTP cases PASS. Đó là topology cũ có primary datasource nghiệp vụ trong lab API, không chứng minh runtime đã tách business DB ở V2. Kết quả phiên hiện tại và các mục NOT RUN được ghi riêng trong [hợp đồng V2](../../docs/contract/tv3-v2-handover.md).
 
 Chưa có bằng chứng ModSecurity/CRS end-to-end trong repository này. Các expected WAF `403` ở mục 4–5 vẫn là tiêu chí tích hợp, không phải kết quả đã chạy.

@@ -5,6 +5,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Http-Response.ps1')
 foreach ($address in @($BaseUrl, $LabBaseUrl)) {
     if ($address -and ([uri]$address).Host -notin @('localhost', '127.0.0.1', '[::1]')) {
         throw 'This script only targets a local backend/lab.'
@@ -29,7 +30,7 @@ function Call-Api($name, $base, $method, $path, $body, $token, $expected) {
         throw "$name expected HTTP $expected, received $($response.StatusCode) (body omitted)."
     }
     $results.Add([pscustomobject]@{ case = $name; status = [int]$response.StatusCode })
-    return $response
+    return [pscustomobject]@{ StatusCode = [int]$response.StatusCode; Content = (ConvertTo-HttpText $response.Content) }
 }
 
 # Only new randomly named accounts and records; never delete existing data.
@@ -70,10 +71,22 @@ $null = Call-Api 'posts-me-anonymous' $BaseUrl GET '/api/v1/posts/me' $null $nul
 $null = Call-Api 'backend-health' $BaseUrl GET '/actuator/health' $null $null 200
 
 if ($LabBaseUrl) {
+    # Lab has disposable identities and a separate JWT key. Never reuse a business token.
+    $labUsername = 'lab' + $suffix
+    $null = Call-Api 'lab-register' $LabBaseUrl POST '/api/v1/auth/register' @{
+        username=$labUsername; email="$labUsername@example.test"; password=$password
+    } $null 201
+    $labLogin = Call-Api 'lab-login' $LabBaseUrl POST '/api/v1/auth/login' @{
+        username=$labUsername; password=$password
+    } $null 200
+    $labToken = ($labLogin.Content | ConvertFrom-Json).accessToken
+    if (-not $labToken) { throw 'Lab login did not return an access token (body omitted).' }
+    $null = Call-Api 'business-jwt-rejected-by-lab' $LabBaseUrl POST '/api/v1/vuln/records/search' @{keyword='alpha'} $ownerToken 401
+    $null = Call-Api 'lab-jwt-rejected-by-main' $BaseUrl POST $searchPath @{keyword='alpha'} $labToken 401
     $path = '/api/v1/vuln/records/search'
-    $normal = Call-Api 'lab-normal' $LabBaseUrl POST $path @{keyword='alpha'} $ownerToken 200
+    $normal = Call-Api 'lab-normal' $LabBaseUrl POST $path @{keyword='alpha'} $labToken 200
     if (@($normal.Content | ConvertFrom-Json).Count -ne 1) { throw 'Lab fixture must match exactly one alpha record.' }
-    $injected = Call-Api 'lab-sqli-contrast' $LabBaseUrl POST $path @{keyword=$payload} $ownerToken 200
+    $injected = Call-Api 'lab-sqli-contrast' $LabBaseUrl POST $path @{keyword=$payload} $labToken 200
     $rows = @($injected.Content | ConvertFrom-Json)
     if ($rows.Count -ne 3 -or @($rows | Where-Object { $_.content -notlike 'LAB-ONLY *' }).Count -ne 0) {
         throw 'Unexpected lab dataset; stop and inspect isolation.'
@@ -81,13 +94,13 @@ if ($LabBaseUrl) {
     foreach ($table in @('users', 'refresh_tokens', 'secure_records')) {
         $null = Call-Api "lab-cannot-read-$table" $LabBaseUrl POST $path @{
             keyword="' UNION ALL SELECT id, 'forbidden' FROM public.$table -- "
-        } $ownerToken 400
+        } $labToken 400
     }
     $null = Call-Api 'lab-cannot-read-credential-catalog' $LabBaseUrl POST $path @{
         keyword="' UNION ALL SELECT 99, rolpassword FROM pg_catalog.pg_authid -- "
-    } $ownerToken 400
+    } $labToken 400
     $null = Call-Api 'lab-no-jwt' $LabBaseUrl POST $path @{keyword='alpha'} $null 401
-    $null = Call-Api 'lab-invalid-input' $LabBaseUrl POST $path @{keyword=' '} $ownerToken 400
+    $null = Call-Api 'lab-invalid-input' $LabBaseUrl POST $path @{keyword=' '} $labToken 400
 }
 
 # No passwords, tokens or response bodies in output.

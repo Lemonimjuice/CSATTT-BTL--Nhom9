@@ -12,8 +12,8 @@ try {
     $dockerArguments = @('run', '--rm', '--mount', "type=bind,source=$repoPath,target=/workspace", '--workdir', '/workspace')
     if ($WithLab) {
         # Resolve project-specific network names without displaying resolved Compose credentials.
-        $composeArguments = @('compose', '--env-file', '.env', '--env-file', '.env.sqli-lab',
-            '-f', 'docker-compose.yml', '-f', 'docker-compose.sqli-lab.yml', '--profile', 'sqli-lab')
+        $composeArguments = @('compose', '--env-file', '.env.sqli-lab',
+            '-f', 'docker-compose.sqli-lab.yml', '--profile', 'sqli-lab')
         $configText = & docker @composeArguments config --format json
         if ($LASTEXITCODE -ne 0) { throw 'Lab Compose config is invalid.' }
         $config = $configText | ConvertFrom-Json
@@ -23,8 +23,7 @@ try {
             Where-Object { $_.StartsWith('SQLI_LAB_READER_PASSWORD=') } | Select-Object -First 1
         if (-not $readerLine) { throw 'Missing local lab reader password.' }
         $env:SQLI_DEMO_DB_PASSWORD = $readerLine.Substring('SQLI_LAB_READER_PASSWORD='.Length).Trim().Trim('"').Trim("'")
-        $dockerArguments += @('--network', $config.networks.'blog-net'.name,
-            '--network', $config.networks.'sqli-lab-net'.name,
+        $dockerArguments += @('--network', $config.networks.'sqli-lab-net'.name,
             '--env', 'SQLI_LAB_TEST_ENABLED=true',
             '--env', 'SQLI_DEMO_DB_URL=jdbc:postgresql://sqli-lab-db:5432/sqli_lab',
             '--env', 'SQLI_DEMO_DB_USERNAME=sqli_demo_reader', '--env', 'SQLI_DEMO_DB_PASSWORD')
