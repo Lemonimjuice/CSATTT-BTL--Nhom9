@@ -6,7 +6,7 @@ Nguồn sự thật cho `docker-compose.yml` ở thư mục gốc.
 
 | Service (container_name) | Image | Mạng (IP cố định) | Cổng ra host | Ghi chú |
 |---|---|---|---|---|
-| `nginx-waf` | `owasp/modsecurity-crs:4.30.0-nginx-alpine-202610180210@sha256:873ce68a…` (CRS 4.30.0, ModSecurity 3.0.17, Nginx 1.30.6, Alpine 3.24.2) | `dmz_net`; `internal_net` (10.209.10.10) | `80`→8080 (redirect), `443`→8443 | Điểm vào duy nhất; nginx chạy uid 101, `cap_drop: ALL` |
+| `nginx-waf` | `owasp/modsecurity-crs:4.30.0-nginx-alpine-202610180210@sha256:873ce68a…` (CRS 4.30.0, ModSecurity 3.0.17, Nginx 1.30.6, Alpine 3.24.2) | `dmz_net`; `internal_net` (10.209.10.10) | chỉ `443`→8443 (cổng 8080 chỉ dùng nội bộ cho healthcheck) | Điểm vào duy nhất; nginx chạy uid 101, `cap_drop: ALL` |
 | `backend-node-1`, `backend-node-2` | `nhom9/blog-api:local` (build `./backend`) | `internal_net` | không | Cổng nội bộ `8080`; chạy cả `/secure` và `/vuln` |
 | `database` | `postgres:16-alpine` | `internal_net` | không | Volume `postgres_data`; chứa `blogdb` và `sqli_lab` |
 
@@ -53,6 +53,7 @@ Header trả về client: `X-Request-ID`, `X-Upstream` (chỉ cho demo), `X-Cont
 | `= /api/v1/auth/login` | 5 r/phút mỗi IP, burst 5 | `backend_cluster` |
 | `= /actuator/health` | 5 r/giây, burst 10 | `backend_cluster` |
 | `/actuator/` (còn lại) | — | `404` tại Nginx |
+| `/swagger-ui*`, `/v3/api-docs*` | — | `404` tại Nginx (tài liệu API không công khai) |
 | `/` (gồm `/api/v1/secure` và `/api/v1/vuln`) | 5 r/giây, burst 10 | `backend_cluster` |
 
 Không còn node nào phản hồi: Nginx trả `503` JSON.

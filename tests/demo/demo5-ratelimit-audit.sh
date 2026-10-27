@@ -36,4 +36,11 @@ BE=$(backend_logs | grep -c "$RID")
 note "Request hợp lệ -> HTTP $s, rid $RID: log backend $BE dòng"
 check "Backend ghi đúng rid do Nginx sinh" 1 "$([ "$BE" -ge 1 ] && echo 1 || echo 0)"
 
+title "Bổ sung 4: chỉ mở đúng những gì cần ra ngoài"
+check "Swagger UI không công khai" 404 "$(req GET /swagger-ui/index.html "")"
+check "Tài liệu OpenAPI không công khai" 404 "$(req GET /v3/api-docs "")"
+check "Actuator khác health không công khai" 404 "$(req GET /actuator/env "")"
+P80=$(curl -s -o /dev/null -m 3 -w '%{http_code}' http://localhost/ 2>/dev/null || true)
+check "Cổng 80 đóng (chỉ mở 443 theo đề cương)" 000 "$P80"
+
 summary

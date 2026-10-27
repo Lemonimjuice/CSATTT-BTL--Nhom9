@@ -61,6 +61,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/categories/**").hasRole("ADMIN")
                         // Secure records require authentication
                         .requestMatchers("/api/v1/secure/**").authenticated()
+                        // Lab-only copy of the original bug: drafts were readable publicly by ID
+                        .requestMatchers(HttpMethod.GET, "/api/v1/vuln/posts/**").permitAll()
                         .requestMatchers("/api/v1/vuln/**").authenticated()
                         // Everything else requires authentication
                         .anyRequest().authenticated()

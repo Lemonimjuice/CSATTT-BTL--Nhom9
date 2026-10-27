@@ -240,13 +240,14 @@ class RecordApiIntegrationTest {
         String adminToken = tokenFor(admin.getUsername());
 
         for (String path : new String[]{"/api/v1/posts/" + draft.getId(), "/api/v1/posts/slug/draft"}) {
-            mockMvc.perform(get(path)).andExpect(status().isForbidden());
+            // Anonymous: 401 (log in first); known non-owner below: 403.
+            mockMvc.perform(get(path)).andExpect(status().isUnauthorized());
             mockMvc.perform(get(path).header("Authorization", "Bearer " + ownerToken)).andExpect(status().isOk());
             mockMvc.perform(get(path).header("Authorization", "Bearer " + otherToken)).andExpect(status().isForbidden());
             mockMvc.perform(get(path).header("Authorization", "Bearer " + adminToken)).andExpect(status().isOk());
         }
         for (String path : new String[]{"/api/v1/posts/" + archived.getId(), "/api/v1/posts/slug/archived"}) {
-            mockMvc.perform(get(path)).andExpect(status().isForbidden());
+            mockMvc.perform(get(path)).andExpect(status().isUnauthorized());
             mockMvc.perform(get(path).header("Authorization", "Bearer " + ownerToken)).andExpect(status().isOk());
         }
     }

@@ -12,6 +12,9 @@ Các quyết định đã chốt cho hệ thống. Cập nhật lần cuối: 27
 - Cụm API lỗi `/api/v1/vuln` chạy **ngay trên 2 node backend chính** (bật profile `sqli-lab` và `SQLI_DEMO_ENABLED=true`), song song với cụm vá `/api/v1/secure`. Dùng chung token, JWT secret và CSDL — khớp mục 3 đề cương.
 - Dữ liệu cho phần SQLi nằm ở database `sqli_lab` **riêng trong cùng container `database`**, truy cập bằng tài khoản chỉ-đọc `sqli_demo_reader` (`database/init/04-sqli-demo.sh`). PostgreSQL không cho một câu lệnh truy vấn chéo database, nên SQLi ở cụm `/vuln` không chạm được bảng `public.users` của `blogdb`.
 - `container_name` đặt đúng tên service (`backend-node-1`...) để lệnh demo trong đề cương chạy nguyên văn: `docker compose stop backend-node-1`.
+- Chỉ publish cổng `443` ra host (TV1.1: "chỉ nginx-waf mở cổng 443 ra ngoài"). Cổng 8080 của Nginx chỉ dùng nội bộ cho healthcheck.
+- Không công khai qua Nginx: `/actuator/*` (trừ `/actuator/health`), `/swagger-ui*`, `/v3/api-docs*` (tài liệu API liệt kê cả cụm `/vuln`).
+- Chạy được cả trên Linux: `init-env.sh` tạo sẵn `logs/` có quyền ghi, khóa chứng chỉ quyền 644, `modsec_audit.log` quyền 644, `04-sqli-demo.sh` có quyền chạy trong git (Nginx của image ModSecurity chạy bằng uid 101, không phải root).
 
 ## D3. Nginx + ModSecurity
 
@@ -30,7 +33,9 @@ Các quyết định đã chốt cho hệ thống. Cập nhật lần cuối: 27
 | Đọc bài nháp của người khác qua ID | `GET /api/v1/vuln/posts/{id}` | `GET /api/v1/secure/posts/{id}` → `403` |
 | Lộ email tác giả | `/api/v1/vuln/posts/{id}` trả `author.email` | Response chỉ có `id, username, role` |
 | Thiếu kiểm tra quyền (IDOR) | `PUT/DELETE /api/v1/vuln/posts/{id}` | `PUT/DELETE /api/v1/secure/posts/{id}` → `403` |
-| Chưa đăng nhập trả 403 | — | `401` cho route cần xác thực |
+| Chưa đăng nhập trả 403 | — | `401` cho route cần xác thực, kể cả khi đọc bài/bình luận riêng tư (DRAFT/ARCHIVED); đã đăng nhập nhưng không có quyền: `403` |
+
+Bản lỗi `GET /api/v1/vuln/posts/{id}` không cần đăng nhập, đúng lỗi gốc "bài nháp đọc được công khai qua GET theo ID".
 
 Cụm `/secure/posts` dùng chung tầng Service (có Ownership Check) với route bài viết thường.
 
@@ -41,6 +46,8 @@ Cụm `/secure/posts` dùng chung tầng Service (có Ownership Check) với rou
 - Nginx sinh `X-Request-ID` (`$request_id`), đồng thời đặt làm transaction ID của ModSecurity. Một mã đối chiếu được giữa log Nginx (`rid=`), `modsec_audit.log` (`unique_id`) và log backend (`reqId=`).
 - **Audit log tập trung**: mọi log ghi ra thư mục `logs/` trên máy host: `logs/nginx/`, `logs/waf/modsec_audit.log`, `logs/backend-node-1/audit.log`, `logs/backend-node-2/audit.log`. Mẫu log backend có `reqId`, `user` và `ip` (IP client thật), gồm cả sự kiện đăng nhập, bị từ chối 401/403, sửa/xóa dữ liệu.
 - `modsec_audit.log` (JSON) chỉ ghi phần A, H, K, Z: không có header và body request, nên không lộ JWT, mật khẩu.
+- File audit của backend bỏ dòng healthcheck nội bộ của Docker (`/actuator/health` từ 127.0.0.1, mỗi 10 giây) bằng bộ lọc `LocalHealthCheckLogFilter`, chỉ gắn vào file; healthcheck đi qua Nginx vẫn được ghi. Thời gian trong file ghi kèm múi giờ (`Z` = UTC).
+- Chuyển chế độ WAF bằng `sh scripts/waf-mode.sh On|DetectionOnly`: kiểm tra giá trị hợp lệ, in chế độ đang chạy, cảnh báo khi đang DetectionOnly.
 
 ## D6. WAF: chế độ, ngưỡng, luật tùy chỉnh
 

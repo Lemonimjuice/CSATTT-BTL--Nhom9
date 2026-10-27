@@ -1,6 +1,7 @@
 server:
   port: 8080
-  # No trusted reverse proxy has been established; audit the direct peer only.
+  # Default: trust no reverse proxy, audit the direct peer only.
+  # Profile `integration` overrides this to trust X-Forwarded-For from the group Nginx IP only.
   forward-headers-strategy: none
 
 spring:

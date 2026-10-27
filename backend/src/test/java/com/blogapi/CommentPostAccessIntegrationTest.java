@@ -91,9 +91,9 @@ class CommentPostAccessIntegrationTest {
         saveComment(post, root);
         boolean allowed = mayRead(state, actor);
         http.perform(as(actor, get("/api/v1/posts/{id}", post.getId())))
-                .andExpect(status().is(allowed ? 200 : 403));
+                .andExpect(status().is(deniedOr200(allowed, actor)));
         http.perform(as(actor, get("/api/v1/posts/{id}/comments", post.getId())))
-                .andExpect(status().is(allowed ? 200 : 403))
+                .andExpect(status().is(deniedOr200(allowed, actor)))
                 .andExpect(content().string(allowed ? containsString("comment-content-fixture")
                         : not(containsString("comment-content-fixture"))));
     }
@@ -107,7 +107,7 @@ class CommentPostAccessIntegrationTest {
         boolean allowed = mayRead(state, actor);
         for (Comment comment : new Comment[]{root, reply}) {
             http.perform(as(actor, get("/api/v1/comments/{id}", comment.getId())))
-                    .andExpect(status().is(allowed ? 200 : 403))
+                    .andExpect(status().is(deniedOr200(allowed, actor)))
                     .andExpect(content().string(allowed ? containsString("comment-content-fixture")
                             : not(containsString("comment-content-fixture"))));
         }
@@ -137,12 +137,17 @@ class CommentPostAccessIntegrationTest {
         for (Post.Status state : new Post.Status[]{Post.Status.DRAFT, Post.Status.ARCHIVED}) {
             post.setStatus(state);
             posts.save(post);
-            http.perform(get("/api/v1/comments/{id}", comment.getId())).andExpect(status().isForbidden());
+            http.perform(get("/api/v1/comments/{id}", comment.getId())).andExpect(status().isUnauthorized());
             http.perform(as("other", get("/api/v1/posts/{id}/comments", post.getId())))
                     .andExpect(status().isForbidden());
             http.perform(as("owner", get("/api/v1/comments/{id}", comment.getId())))
                     .andExpect(status().isOk());
         }
+    }
+
+    /** Private read: anonymous callers get 401 (log in first), known non-owners get 403. */
+    private int deniedOr200(boolean allowed, String actor) {
+        return allowed ? 200 : actor.equals("anonymous") ? 401 : 403;
     }
 
     private boolean mayRead(Post.Status state, String actor) {

@@ -26,6 +26,10 @@ check "B xóa bài của A" 403 "$s"
 title "Bước 3: chưa đăng nhập -> 401 (phân biệt với 403 khi đã đăng nhập nhưng không có quyền)"
 s=$(req PUT /api/v1/secure/posts/$POST_A_DRAFT "" '{"title":"x"}')
 check "PUT không có token" 401 "$s"
+s=$(req GET /api/v1/secure/posts/$POST_A_DRAFT "")
+check "Đọc nháp không có token (bản vá)" 401 "$s"
+s=$(req GET /api/v1/posts/$POST_A_DRAFT "")
+check "Đọc nháp không có token qua route công khai" 401 "$s"
 
 title "Bước 4: audit log backend ghi lại lần bị từ chối (username, IP thật, rid)"
 sleep 1
@@ -34,6 +38,9 @@ N=$(backend_logs | grep "$RID" | grep -c 'user=user_b')
 check "Log backend có rid + user_b cho request bị từ chối" 1 "$([ "$N" -ge 1 ] && echo 1 || echo 0)"
 
 title "Đối chứng: bản LỖI /api/v1/vuln/posts (cùng backend, cùng token)"
+s=$(req GET /api/v1/vuln/posts/$POST_A_DRAFT "")
+note "GET không token -> $s  $(body)"
+check "Bản lỗi: ai cũng đọc được nháp, không cần đăng nhập (lỗi gốc)" 200 "$s"
 s=$(req GET /api/v1/vuln/posts/$POST_A_DRAFT "$TB")
 note "GET -> $s  $(body)"
 check "Bản lỗi: B đọc được nháp của A" 200 "$s"
