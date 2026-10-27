@@ -6,7 +6,7 @@ Nguồn sự thật cho `docker-compose.yml` ở thư mục gốc.
 
 | Service (container_name) | Image | Mạng (IP cố định) | Cổng ra host | Ghi chú |
 |---|---|---|---|---|
-| `nginx-waf` | `owasp/modsecurity-crs:nginx-alpine@sha256:873ce68a…` (nginx 1.30.6, ModSecurity 3.0.17, CRS 4.30.0) | `dmz_net`; `internal_net` (10.209.10.10) | `80`→8080 (redirect), `443`→8443 | Điểm vào duy nhất; nginx chạy uid 101, `cap_drop: ALL` |
+| `nginx-waf` | `owasp/modsecurity-crs:4.30.0-nginx-alpine-202610180210@sha256:873ce68a…` (CRS 4.30.0, ModSecurity 3.0.17, Nginx 1.30.6, Alpine 3.24.2) | `dmz_net`; `internal_net` (10.209.10.10) | `80`→8080 (redirect), `443`→8443 | Điểm vào duy nhất; nginx chạy uid 101, `cap_drop: ALL` |
 | `backend-node-1`, `backend-node-2` | `nhom9/blog-api:local` (build `./backend`) | `internal_net` | không | Cổng nội bộ `8080`; chạy cả `/secure` và `/vuln` |
 | `database` | `postgres:16-alpine` | `internal_net` | không | Volume `postgres_data`; chứa `blogdb` và `sqli_lab` |
 

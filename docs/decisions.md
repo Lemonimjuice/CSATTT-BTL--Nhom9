@@ -15,7 +15,8 @@ Các quyết định đã chốt cho hệ thống. Cập nhật lần cuối: 27
 
 ## D3. Nginx + ModSecurity
 
-- Image `owasp/modsecurity-crs:nginx-alpine` ghim theo digest (nginx 1.30.6, libmodsecurity 3.0.17, CRS 4.30.0).
+- Image `owasp/modsecurity-crs:4.30.0-nginx-alpine-202610180210`, ghim thêm digest `sha256:873ce68a658d2e3b61484a8a24d215f7d15456e7ce5aec5e7114bf000d743365` (OWASP CRS 4.30.0, libmodsecurity 3.0.17, Nginx 1.30.6, Alpine 3.24.2). Tag để người đọc thấy phiên bản; digest để Docker tải đúng một bản trên mọi máy.
+- Kiểm tra đã tải đúng bản: `docker images --digests owasp/modsecurity-crs`, so cột **DIGEST** với digest trên. Không so cột IMAGE ID: giá trị này khác nhau tùy chế độ lưu image của Docker (containerd hay bản cũ), dù cùng một image.
 - Bỏ qua entrypoint sinh cấu hình của image; nhóm tự quản lý `nginx/nginx.conf` và `nginx/modsecurity/*` để cấu hình nằm trọn trong Git.
 - Image chạy nginx bằng user không đặc quyền: nghe 8080/8443 trong container, compose map ra 80/443; `cap_drop: ALL`, `no-new-privileges`.
 - `SecRuleEngine On` đặt trong `modsecurity.conf` (đúng TV2.2). Demo 3 ghi đè thành `DetectionOnly` qua file `mode/<WAF_MODE>.conf` nạp ngay sau đó.
