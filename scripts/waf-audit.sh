@@ -7,7 +7,7 @@
 set -eu
 export MSYS_NO_PATHCONV=1   # Git Bash: không đổi đường dẫn container thành đường dẫn Windows
 cd "$(dirname "$0")/.."
-LOG=/var/log/modsecurity/audit/audit.log
+LOG=/var/log/modsecurity/audit/modsec_audit.log   # trùng SecAuditLog trong nginx/modsecurity/modsecurity.conf
 
 case "${1:-}" in
     --export)
