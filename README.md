@@ -4,7 +4,7 @@ Kiến trúc phòng thủ đa lớp (Defense in Depth) tích hợp WAF trên Loa
 
 ```text
                  Internet / máy kiểm thử
-                          │ HTTPS 443 (HTTP 80 chỉ redirect)
+                          │ chỉ mở HTTPS 443
               ┌───────────▼─────────────┐  dmz_net
  Lớp 1        │ nginx-waf               │  SSL Termination, Rate Limiting, Round-Robin + Failover,
  (biên)       │ ModSecurity + OWASP CRS │  JSON Body Inspection, vá ảo, X-Request-ID
@@ -26,9 +26,12 @@ lỗ hổng cố ý không chạm được bảng của `blogdb`.
 
 ## Chạy hệ thống
 
-Yêu cầu: Docker Desktop (Compose v2), Git Bash (có sẵn `openssl` và `sh`). Mọi lệnh chạy từ thư mục gốc repo.
+Yêu cầu: Docker Desktop (Compose v2) và **Git Bash** (cài cùng Git for Windows, có sẵn `openssl` và `sh`).
+Mọi lệnh dưới đây chạy **trong Git Bash** (chuột phải thư mục repo > *Open Git Bash here*), từ thư mục gốc
+repo; không chạy trong PowerShell hay CMD. macOS/Linux dùng terminal bình thường.
 
-**1. Sinh file `.env`** với mọi mật khẩu, khóa ngẫu nhiên (không ghi đè nếu đã có):
+**1. Chuẩn bị môi trường**: tạo thư mục `logs/` và sinh file `.env` với mọi mật khẩu, khóa ngẫu nhiên
+(chạy lại nhiều lần cũng an toàn, không ghi đè `.env` đã có):
 
 ```bash
 sh scripts/init-env.sh
@@ -40,24 +43,36 @@ sh scripts/init-env.sh
 sh nginx/certs/generate-cert.sh
 ```
 
-**3. Build và chạy** (lần đầu mất vài phút để Maven tải thư viện):
+**3. Build và chạy** (lần đầu mất vài phút và cần Internet; sau mỗi lần `git pull` luôn kèm `--build`):
 
 ```bash
 docker compose up -d --build --wait
 ```
 
-**4. Chạy toàn bộ demo** (các kiểm tra tự động, in kết quả PASS/FAIL):
+Truy cập qua `https://localhost` (chỉ mở cổng 443, không có `http://`).
+
+**4. Kiểm tra nhanh** toàn hệ thống (Docker, `.env`, chứng chỉ, 4 container, WAF, dữ liệu mẫu), in PASS/WARN/FAIL
+kèm cách sửa:
+
+```bash
+sh scripts/preflight.sh
+```
+
+**5. Chạy toàn bộ demo** (các kiểm tra tự động, in kết quả PASS/FAIL):
 
 ```bash
 sh tests/demo/run-all.sh
 ```
 
-**Sửa file SQL trong `database/init/` xong phải xóa volume** rồi chạy lại, vì PostgreSQL chỉ chạy script
-khởi tạo khi volume trống. Lệnh này xóa toàn bộ dữ liệu cũ:
+**Đưa về trạng thái sạch** (xóa dữ liệu DB và log, dựng lại với dữ liệu mẫu gốc, rồi chạy preflight). Dùng trước
+buổi trình bày, sau khi sửa file trong `database/init/`, hoặc khi cập nhật từ bản cũ:
 
 ```bash
-docker compose down -v
+sh scripts/reset-demo.sh --yes
 ```
+
+Trước buổi trình bày đọc [docs/demo-checklist.md](docs/demo-checklist.md): việc cần làm, lưu ý khi demo và bảng
+xử lý sự cố.
 
 ## Tài khoản thử nghiệm
 
@@ -78,8 +93,11 @@ Mọi route dùng chung token lấy ở `/api/v1/auth/login`.
 | 1. HA & Failover | `tests/demo/demo1-failover.sh` | `docker compose stop backend-node-1`, token cũ vẫn dùng được, Nginx chuyển sang node 2 |
 | 2. Vá ảo tại WAF | `tests/demo/demo2-waf-virtual-patch.sh` | SQLi vào `/api/v1/vuln/records/search` bị WAF chặn `403`, audit có rule `100100`, backend không nhận request |
 | 3. Defense in Depth | `tests/demo/demo3-defense-in-depth.sh` | WAF chuyển DetectionOnly: bản lỗi lộ 3 dòng, bản vá (Parameterized Query) trả `[]`; UNION sang `blogdb` thất bại |
-| 4. Chống IDOR | `tests/demo/demo4-idor.sh` | User B thao tác trên nháp của A tại `/api/v1/secure/posts/{id}`: `403` từ backend (không có `X-Blocked-By`), chưa đăng nhập `401`; `/api/v1/vuln/posts/{id}` thì cho phép |
-| Bổ sung | `tests/demo/demo5-ratelimit-audit.sh` | Brute-force đăng nhập bị `429`; IP giả trong `X-Forwarded-For` không vào audit log; 1 request ID xuyên suốt Nginx, WAF, backend |
+| 4. Chống IDOR | `tests/demo/demo4-idor.sh` | User B thao tác trên nháp của A tại `/api/v1/secure/posts/{id}`: `403` từ backend (không có `X-Blocked-By`), chưa đăng nhập `401`; bản lỗi `/api/v1/vuln/posts/{id}` cho người chưa đăng nhập đọc nháp (lộ email) và cho B sửa bài |
+| Bổ sung | `tests/demo/demo5-ratelimit-audit.sh` | Brute-force đăng nhập bị `429`; IP giả trong `X-Forwarded-For` không vào audit log; 1 request ID xuyên suốt Nginx, WAF, backend; Swagger, actuator và cổng 80 không mở ra ngoài |
+
+Demo 3 đổi chế độ WAF bằng `sh scripts/waf-mode.sh DetectionOnly` và trả lại bằng `sh scripts/waf-mode.sh On`
+(script demo tự làm việc này).
 
 Kiểm thử thủ công: Postman trong `tests/postman/` (phủ toàn bộ API), mẫu request Burp trong `tests/burp/`
 (hướng dẫn trong [tests/burp/README.md](tests/burp/README.md)).
@@ -98,6 +116,8 @@ logs/
 ```
 
 Một request có thể đối chiếu qua 3 lớp bằng `X-Request-ID` (= `unique_id` trong audit WAF, `reqId=` trong log backend).
+Log backend bỏ các dòng healthcheck nội bộ của Docker (mỗi 10 giây) để chỉ còn sự kiện thật. Giờ trong log là UTC
+(giờ Việt Nam = UTC+7).
 
 ## Cấu trúc thư mục và người phụ trách
 
@@ -109,10 +129,14 @@ CSATTT-BTL--Nhom9/
 ├── .env.example                       # TV1 (mẫu biến môi trường, không chứa mật khẩu thật)
 ├── docker-compose.yml                 # TV1 (4 container, 2 mạng; TV2/TV3 gửi thay đổi qua ports-and-env.md)
 ├── scripts/
-│   ├── init-env.sh                    # TV1 (sinh .env với mật khẩu, khóa ngẫu nhiên)
-│   └── waf-audit.sh                   # TV2 (xem/xuất modsec_audit.log)
+│   ├── init-env.sh                    # TV1 (tạo thư mục logs/, sinh .env với mật khẩu, khóa ngẫu nhiên)
+│   ├── preflight.sh                   # TV1 (kiểm tra nhanh toàn hệ thống trước khi trình bày)
+│   ├── reset-demo.sh                  # TV1 (xóa dữ liệu, dựng lại sạch với dữ liệu mẫu gốc)
+│   ├── waf-mode.sh                    # TV2 (đổi chế độ WAF On / DetectionOnly)
+│   └── waf-audit.sh                   # TV2 (xem modsec_audit.log theo request ID)
 ├── docs/
 │   ├── decisions.md                   # Cả nhóm đề xuất, TV1 chốt (quy ước kỹ thuật chung)
+│   ├── demo-checklist.md              # TV4 (checklist trình bày, bảng xử lý sự cố; cả nhóm đọc)
 │   ├── test-evidence/                 # TV4 (hướng dẫn chụp minh chứng; bản gốc để trên Drive)
 │   └── contract/                      # TV3 chủ trì, cả nhóm đọc
 │       ├── api-endpoints.md           # TV3 (danh sách endpoint, cặp /vuln – /secure)
@@ -130,7 +154,7 @@ CSATTT-BTL--Nhom9/
 │       ├── mode/                      # TV2 (On.conf, DetectionOnly.conf, chọn bằng WAF_MODE)
 │       └── custom-rules/              # TV2 (đúng 2 luật tùy chỉnh: 100100, 100200)
 ├── backend/                           # TV3 (Spring Boot 3.2.5 / Java 21; cụm /secure và /vuln trong src/.../controller, demo)
-│   ├── Dockerfile, pom.xml, src/      # TV3
+│   ├── Dockerfile, pom.xml, src/      # TV3 (test cặp /secure – /vuln: src/test/.../PostSecureVulnPairIntegrationTest.java)
 │   └── (docker-compose.sqli-lab*.yml, scripts/, docs/ của bộ kiểm thử E2E riêng — TV3)
 ├── database/
 │   └── init/                          # Mount vào /docker-entrypoint-initdb.d/ của PostgreSQL
