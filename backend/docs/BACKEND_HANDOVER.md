@@ -1,5 +1,7 @@
 # Backend handover — V2
 
+> **Ghi chú tích hợp nhóm (27/10/2026), đọc trước:** đây là tài liệu lịch sử của TV3, viết khi cụm `/vuln` còn chạy trong lab riêng. Thiết kế nhóm hiện tại khác ở 4 điểm: (1) cụm `/vuln` bật trên 2 node chính (`SQLI_DEMO_ENABLED=true`), phần SQLi chỉ truy vấn database `sqli_lab` riêng bằng tài khoản chỉ-đọc; (2) không còn lab, identity DB hay JWT riêng, `/vuln` và `/secure` dùng chung token; (3) profile `integration` chỉ tin `X-Forwarded-For` từ IP của `nginx-waf`, nên audit ghi IP client thật; (4) chưa đăng nhập mà đọc bài riêng tư trả `401`. Nginx/WAF đã tích hợp và kiểm chứng. Chi tiết: [docs/decisions.md](../../docs/decisions.md).
+
 > Cập nhật Feature Freeze: source hardening mới đã chạy Docker E2E **152 Maven / 42 HTTP secure-lab / 12 two-node PASS**, không failures/errors/skips. Các số liệu 92/30/12 bên dưới là baseline `101d4c6`. Thay đổi contract và giới hạn mới cho TV1/TV4: [FEATURE_FREEZE.md](FEATURE_FREEZE.md).
 
 Tài liệu hiện hành cho repository nhóm: [TV3 V2 handover](../../docs/contract/tv3-v2-handover.md) và [backend README](../README.md). Các hướng dẫn Compose standalone cũ đã được thay thế.

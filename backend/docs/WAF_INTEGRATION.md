@@ -1,3 +1,5 @@
+> **Ghi chú tích hợp nhóm (27/10/2026), đọc trước:** đây là tài liệu lịch sử của TV3, viết khi cụm `/vuln` còn chạy trong lab riêng. Thiết kế nhóm hiện tại khác ở 4 điểm: (1) cụm `/vuln` bật trên 2 node chính (`SQLI_DEMO_ENABLED=true`), phần SQLi chỉ truy vấn database `sqli_lab` riêng bằng tài khoản chỉ-đọc; (2) không còn lab, identity DB hay JWT riêng, `/vuln` và `/secure` dùng chung token; (3) profile `integration` chỉ tin `X-Forwarded-For` từ IP của `nginx-waf`, nên audit ghi IP client thật; (4) chưa đăng nhập mà đọc bài riêng tư trả `401`. Nginx/WAF đã tích hợp và kiểm chứng. Chi tiết: [docs/decisions.md](../../docs/decisions.md).
+
 > **Cập nhật V2 27/10/2026:** xem [hợp đồng hiện hành](../../docs/contract/tv3-v2-handover.md). Backend Docker E2E đã PASS; WAF/ModSecurity vẫn NOT RUN. Lab dùng identity DB/JWT riêng. Runner dùng plain HTTP gateway test, bỏ publish trực tiếp từ API và cấp port loopback ngẫu nhiên; gateway này không có WAF và không thay gateway TV1/TV2.
 
 # Backend / ModSecurity integration contract

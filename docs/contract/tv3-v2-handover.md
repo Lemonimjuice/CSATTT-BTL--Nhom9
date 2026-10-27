@@ -1,5 +1,7 @@
 # Bàn giao Backend V2 cho TV1/TV2 — 27/10/2026
 
+> **Ghi chú tích hợp nhóm (27/10/2026), đọc trước:** đây là tài liệu lịch sử của TV3, viết khi cụm `/vuln` còn chạy trong lab riêng. Thiết kế nhóm hiện tại khác ở 4 điểm: (1) cụm `/vuln` bật trên 2 node chính (`SQLI_DEMO_ENABLED=true`), phần SQLi chỉ truy vấn database `sqli_lab` riêng bằng tài khoản chỉ-đọc; (2) không còn lab, identity DB hay JWT riêng, `/vuln` và `/secure` dùng chung token; (3) profile `integration` chỉ tin `X-Forwarded-For` từ IP của `nginx-waf`, nên audit ghi IP client thật; (4) chưa đăng nhập mà đọc bài riêng tư trả `401`. Nginx/WAF đã tích hợp và kiểm chứng. Chi tiết: [docs/decisions.md](../decisions.md).
+
 > Bảng E2E 92/30/12 bên dưới là baseline `101d4c6`. Hardening mới giữ nguyên 92 tests cũ và đạt **152 Maven / 42 HTTP secure-lab / 12 two-node PASS**, exit code 0. Xem [FEATURE_FREEZE.md](../../backend/docs/FEATURE_FREEZE.md) và [API contract notes](api-endpoints.md) trước nghiệm thu: author không còn email, sort được whitelist, `/posts/me` có đủ trạng thái, JWT được validate startup và audit dùng peer IP. Nginx/WAF tích hợp vẫn NOT RUN.
 
 Nhánh bàn giao: `feat/tv3-backend`. Phạm vi: backend và hợp đồng TV3. Gateway HTTP trong bộ test là tài nguyên tạm để kiểm thử, không phải WAF/ModSecurity hoặc gateway production của TV1/TV2. Không thay đổi schema, JWT contract hoặc API endpoints trong phần bổ sung E2E.

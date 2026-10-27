@@ -71,6 +71,20 @@
             "url": "{{baseUrl}}/api/v1/auth/refresh" }
         },
         {
+          "name": "Logout (thu hồi refresh token) -> 204",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('204', () => pm.response.to.have.status(204));"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"refreshToken\":\"{{refreshA}}\"}" },
+            "url": "{{baseUrl}}/api/v1/auth/logout" }
+        },
+        {
+          "name": "Refresh bằng token đã thu hồi -> 401",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('401', () => pm.response.to.have.status(401));"] } }],
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"refreshToken\":\"{{refreshA}}\"}" },
+            "url": "{{baseUrl}}/api/v1/auth/refresh" }
+        },
+        {
           "name": "Sai mật khẩu -> 401 (hoặc 429 nếu đã chạm rate limit)",
           "event": [{ "listen": "test", "script": { "exec": [
             "pm.test('401 sai mật khẩu, hoặc 429 do rate limit đăng nhập', () => pm.expect(pm.response.code).to.be.oneOf([401, 429]));"
@@ -170,6 +184,11 @@
           "name": "GET bài published theo id (public)",
           "event": [{ "listen": "test", "script": { "exec": ["pm.test('200', () => pm.response.to.have.status(200));"] } }],
           "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/posts/{{postAPublic}}" }
+        },
+        {
+          "name": "Ẩn danh đọc bài NHÁP -> 401 (chưa đăng nhập)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('401', () => pm.response.to.have.status(401));"] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/posts/{{postADraft}}" }
         },
         {
           "name": "GET theo slug (public)",
@@ -364,6 +383,19 @@
             "url": "{{baseUrl}}/api/v1/secure/posts/{{postADraft}}" }
         },
         {
+          "name": "VÁ: ẩn danh đọc nháp -> 401",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('401', () => pm.response.to.have.status(401));"] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/secure/posts/{{postADraft}}" }
+        },
+        {
+          "name": "LỖI: ẩn danh đọc nháp của A, thấy email -> 200 (lỗi gốc: đọc công khai)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('Lộ email tác giả', () => pm.expect(pm.response.json().author.email).to.eql('user_a@nhom9.test'));"
+          ] } }],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/vuln/posts/{{postADraft}}" }
+        },
+        {
           "name": "LỖI: B đọc nháp của A, thấy email -> 200",
           "event": [{ "listen": "test", "script": { "exec": [
             "pm.test('200', () => pm.response.to.have.status(200));",
@@ -379,6 +411,28 @@
           "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{tokenB}}" }, { "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{\"title\":\"B da sua bai cua A\"}" },
             "url": "{{baseUrl}}/api/v1/vuln/posts/{{postADraft}}" }
+        },
+        {
+          "name": "A tạo bài tạm để thử DELETE (không đụng dữ liệu mẫu) -> 201",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('201', () => pm.response.to.have.status(201));",
+            "pm.collectionVariables.set('tempPostId', pm.response.json().id);"
+          ] } }],
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{tokenA}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"title\":\"Bai tam de thu xoa\",\"content\":\"se bi xoa\",\"status\":\"DRAFT\"}" },
+            "url": "{{baseUrl}}/api/v1/posts" }
+        },
+        {
+          "name": "VÁ: B xóa bài của A -> 403",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('403', () => pm.response.to.have.status(403));"] } }],
+          "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{tokenB}}" }],
+            "url": "{{baseUrl}}/api/v1/secure/posts/{{tempPostId}}" }
+        },
+        {
+          "name": "LỖI: B xóa bài của A -> 204 (IDOR)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('204', () => pm.response.to.have.status(204));"] } }],
+          "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{tokenB}}" }],
+            "url": "{{baseUrl}}/api/v1/vuln/posts/{{tempPostId}}" }
         }
       ]
     },

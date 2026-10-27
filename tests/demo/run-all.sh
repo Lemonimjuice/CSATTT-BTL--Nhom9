@@ -1,6 +1,6 @@
 #!/bin/sh
-# Chạy lần lượt mọi demo. Yêu cầu stack đang chạy kèm lab:
-#   docker compose --profile lab up -d --build --wait
+# Chạy lần lượt mọi demo. Yêu cầu hệ thống đang chạy:
+#   docker compose up -d --build --wait
 # Dùng: sh tests/demo/run-all.sh
 cd "$(dirname "$0")"
 FAILED=""

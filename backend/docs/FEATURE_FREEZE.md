@@ -1,5 +1,7 @@
 # Backend V2 final hardening — 2026-10-27
 
+> **Ghi chú tích hợp nhóm (27/10/2026), đọc trước:** đây là tài liệu lịch sử của TV3, viết khi cụm `/vuln` còn chạy trong lab riêng. Thiết kế nhóm hiện tại khác ở 4 điểm: (1) cụm `/vuln` bật trên 2 node chính (`SQLI_DEMO_ENABLED=true`), phần SQLi chỉ truy vấn database `sqli_lab` riêng bằng tài khoản chỉ-đọc; (2) không còn lab, identity DB hay JWT riêng, `/vuln` và `/secure` dùng chung token; (3) profile `integration` chỉ tin `X-Forwarded-For` từ IP của `nginx-waf`, nên audit ghi IP client thật; (4) chưa đăng nhập mà đọc bài riêng tư trả `401`. Nginx/WAF đã tích hợp và kiểm chứng. Chi tiết: [docs/decisions.md](../../docs/decisions.md).
+
 Branch: `feat/tv3-backend`. Baseline: `101d4c6`. Scope: the six requested P1 checks, their regressions and two small P2 fixes. No root Compose/Nginx/ModSecurity change, new endpoint, schema change, audit table or new environment variable.
 
 ## Findings and disposition

@@ -1,21 +1,22 @@
 #!/bin/sh
-# Xem audit log ModSecurity (JSON, mỗi dòng một giao dịch).
+# Xem audit log ModSecurity (JSON, mỗi dòng một giao dịch). Chạy từ thư mục gốc repo (Git Bash):
 #   sh scripts/waf-audit.sh               # 5 giao dịch gần nhất, dạng tóm tắt
 #   sh scripts/waf-audit.sh <request-id>  # giao dịch có unique_id = X-Request-ID, bản đầy đủ
-#   sh scripts/waf-audit.sh --export      # chép toàn bộ log ra logs/waf/audit.log (đã .gitignore)
+# Đọc thẳng file trên máy (logs/waf/modsec_audit.log, mount từ container nginx-waf),
+# nên vẫn xem được kể cả khi container đã dừng.
 # Audit log không chứa header/body request (không lộ Authorization, mật khẩu).
 set -eu
-export MSYS_NO_PATHCONV=1   # Git Bash: không đổi đường dẫn container thành đường dẫn Windows
 cd "$(dirname "$0")/.."
-LOG=/var/log/modsecurity/audit/audit.log
+LOG=logs/waf/modsec_audit.log   # trùng SecAuditLog trong nginx/modsecurity/modsecurity.conf
+
+if [ ! -s "$LOG" ]; then
+    echo "Chưa có $LOG (hệ thống chưa chạy, hoặc WAF chưa ghi giao dịch nào)."
+    exit 1
+fi
 
 case "${1:-}" in
-    --export)
-        mkdir -p logs/waf
-        docker compose exec -T nginx-waf cat "$LOG" > logs/waf/audit.log
-        echo "Đã chép $(wc -l < logs/waf/audit.log) giao dịch vào logs/waf/audit.log" ;;
     "")
-        docker compose exec -T nginx-waf tail -n 5 "$LOG" | while IFS= read -r line; do
+        tail -n 5 "$LOG" | while IFS= read -r line; do
             id=$(echo "$line" | grep -o '"unique_id":"[^"]*"' | cut -d'"' -f4)
             uri=$(echo "$line" | grep -o '"uri":"[^"]*"' | head -1 | cut -d'"' -f4)
             code=$(echo "$line" | grep -o '"http_code":[0-9]*' | cut -d: -f2)
@@ -25,5 +26,5 @@ case "${1:-}" in
             echo "    rules: $rules"
         done ;;
     *)
-        docker compose exec -T nginx-waf grep "\"unique_id\":\"$1\"" "$LOG" ;;
+        grep "\"unique_id\":\"$1\"" "$LOG" || { echo "Không có giao dịch nào với request ID $1 (WAF chỉ ghi request có luật khớp)."; exit 1; } ;;
 esac
