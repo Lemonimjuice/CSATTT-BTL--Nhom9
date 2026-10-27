@@ -81,36 +81,61 @@ Token stack chính lấy ở `/api/v1/auth/login`; token lab lấy ở `/lab/api
 Kiểm thử thủ công: Postman trong `tests/postman/`, mẫu request Burp trong `tests/burp/` (hướng dẫn trong [tests/burp/README.md](tests/burp/README.md)).
 Cách thu thập minh chứng cho báo cáo: [docs/test-evidence/README.md](docs/test-evidence/README.md).
 
-## Cấu trúc thư mục
+## Cấu trúc thư mục và người phụ trách
 
 ```
 CSATTT-BTL--Nhom9/
-├── docker-compose.yml          # 4 container chính + 3 container lab (profile lab), 3 mạng
-├── .env.example                # mẫu biến môi trường (giá trị thật nằm trong .env, không commit)
+├── README.md                          # TV1 (dựng khung, cập nhật khi có thay đổi chung; lệnh chạy, tài khoản thử nghiệm, nguồn mã DevFinesse)
+├── .gitignore                         # TV1 (.env, logs/, target/, *.key, *.crt)
+├── .gitattributes                     # TV1 (ép LF cho *.sh, *.sql, *.conf, *.yml; *.http giữ CRLF)
+├── .env.example                       # TV1 (mẫu biến môi trường, không chứa mật khẩu thật)
+├── docker-compose.yml                 # TV1 (4 container chính + 3 container lab profile `lab`, 3 mạng; TV2/TV3 gửi thay đổi qua ports-and-env.md)
 ├── scripts/
-│   ├── init-env.sh             # sinh .env ngẫu nhiên
-│   └── waf-audit.sh            # xem/xuất audit log ModSecurity
+│   ├── init-env.sh                    # TV1 (sinh .env với mật khẩu, khóa ngẫu nhiên)
+│   └── waf-audit.sh                   # TV2 (xem/xuất audit log ModSecurity)
+├── docs/
+│   ├── decisions.md                   # Cả nhóm đề xuất, TV1 chốt (quy ước kỹ thuật chung)
+│   ├── test-evidence/                 # TV4 (hướng dẫn chụp minh chứng; chỉ vài ảnh quan trọng, bản gốc để trên Drive)
+│   └── contract/                      # TV3 chủ trì, cả nhóm đọc
+│       ├── api-endpoints.md           # TV3 (danh sách endpoint, cặp /vuln – /secure)
+│       ├── db-schema.md               # TV3 (bảng, cột, kiểu dữ liệu), TV4 đối chiếu
+│       ├── tv3-v2-handover.md         # TV3 (biên bản bàn giao backend)
+│       └── ports-and-env.md           # TV1 (cổng, tên service, biến môi trường; TV2, TV3 gửi biến cần thêm qua file này)
 ├── nginx/
-│   ├── nginx.conf              # upstream, SSL, rate limit, header, định tuyến lab, phản hồi WAF
-│   ├── certs/generate-cert.sh  # chứng chỉ tự ký (khóa không commit)
-│   └── modsecurity/
-│       ├── modsec-nginx.conf   # bật ModSecurity, transaction ID = X-Request-ID
-│       ├── main.conf           # thứ tự nạp luật
-│       ├── modsecurity.conf    # engine, JSON body processor, audit log
-│       ├── crs-tuning.conf     # paranoia level, ngưỡng, method, content type
-│       ├── mode/               # On.conf, DetectionOnly.conf (chọn bằng WAF_MODE)
-│       └── custom-rules/       # luật tùy chỉnh 100001, 100100, 100200
-├── backend/                    # Spring Boot 3.2.5 / Java 21 (Controller – Service – Repository)
-├── database/init/              # 01 schema, 02 quyền tối thiểu, 03 dữ liệu mẫu
-├── tests/
-│   ├── demo/                   # script tự động cho 4 demo
-│   ├── postman/                # collection + environment
-│   └── burp/                   # request thô cho Repeater/Intruder
-└── docs/
-    ├── decisions.md            # quy ước kỹ thuật đã chốt
-    ├── contract/               # API, schema, cổng và biến môi trường
-    └── test-evidence/          # hướng dẫn và nơi lưu minh chứng
+│   ├── nginx.conf                     # TV1 (upstream, SSL, Rate Limiting, header, định tuyến lab; 1 dòng include modsecurity/modsec-nginx.conf)
+│   ├── certs/                         # TV1 (chứng chỉ tự sinh, không commit khóa)
+│   │   └── generate-cert.sh           # TV1 (script openssl tự sinh chứng chỉ có SAN)
+│   └── modsecurity/                   # TV2
+│       ├── modsec-nginx.conf          # TV2 (modsecurity on; modsecurity_rules_file; transaction ID = X-Request-ID)
+│       ├── main.conf                  # TV2 (thứ tự nạp: engine, chế độ, CRS setup, luật tùy chỉnh, CRS rules)
+│       ├── modsecurity.conf           # TV2 (sửa từ file mặc định của image: JSON body processor, audit log)
+│       ├── crs-tuning.conf            # TV2 (paranoia level, ngưỡng anomaly, method, content type)
+│       ├── mode/                      # TV2 (On.conf, DetectionOnly.conf, chọn bằng WAF_MODE)
+│       └── custom-rules/              # TV2 (luật tùy chỉnh 100001, 100100, 100200)
+├── backend/                           # TV3 (mã nguồn Spring Boot Blog API, gồm cụm /vuln trong src/.../demo/)
+│   ├── .dockerignore                  # TV3 (lấy từ repo gốc)
+│   ├── Dockerfile                     # TV3
+│   ├── pom.xml                        # TV3
+│   ├── src/                           # TV3
+│   ├── docker/, docker-compose.sqli-lab*.yml, scripts/, docs/   # TV3 (lab độc lập và bộ kiểm thử E2E riêng của backend)
+│   └── README.md                      # TV3
+├── database/
+│   └── init/                          # Mount vào /docker-entrypoint-initdb.d/ của PostgreSQL (DB chính và DB lab)
+│       ├── 01-schema.sql              # TV3 (tạo bảng, khớp chính xác entity vì ddl-auto=validate), TV4 đối chiếu
+│       ├── 02-least-privilege.sql     # TV3 (tài khoản app_user, quyền tối thiểu)
+│       └── 03-seed-data.sql           # TV4 (dữ liệu mẫu: Admin, User A, User B; mật khẩu dạng băm BCrypt)
+└── tests/                             # TV4
+    ├── demo/                          # TV4 tổng hợp (run-all.sh, common.sh); từng demo do người phụ trách lớp đó kiểm:
+    │   ├── demo1-failover.sh          #   TV1 (HA & Failover)
+    │   ├── demo2-waf-virtual-patch.sh #   TV2 (vá ảo tại WAF)
+    │   ├── demo3-defense-in-depth.sh  #   TV3 (Parameterized Query khi WAF bị lách)
+    │   ├── demo4-idor.sh              #   TV4 (chống IDOR)
+    │   └── demo5-ratelimit-audit.sh   #   TV1 + TV3 (rate limit, IP thật, request ID)
+    ├── postman/                       # TV4 (Postman Collection + environment)
+    └── burp/                          # TV4 (mẫu request tấn công cho Repeater/Intruder)
 ```
+
+Quy tắc: mỗi file chỉ một người sửa. Muốn sửa file của người khác, báo người đó trước.
 
 Quy ước nhánh, header, WAF, rate limit: [docs/decisions.md](docs/decisions.md). Cổng, service, biến môi trường: [docs/contract/ports-and-env.md](docs/contract/ports-and-env.md). API: [docs/contract/api-endpoints.md](docs/contract/api-endpoints.md).
 
