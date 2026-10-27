@@ -1,6 +1,6 @@
 PUT /api/v1/vuln/posts/3 HTTP/1.1
 Host: localhost
-Authorization: Bearer <TOKEN_LAB_USER_B>
+Authorization: Bearer <TOKEN_USER_B>
 Content-Type: application/json
 Content-Length: 30
 

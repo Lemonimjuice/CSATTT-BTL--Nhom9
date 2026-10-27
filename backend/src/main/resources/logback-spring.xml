@@ -4,16 +4,31 @@
     <springProfile name="!prod">
         <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder>
-                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight(%-5level) [%cyan(%thread)] [reqId=%yellow(%X{requestId:-none})] [user=%green(%X{userId:-anonymous})] %logger{40} - %msg%n</pattern>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight(%-5level) [%cyan(%thread)] [reqId=%yellow(%X{requestId:-none})] [user=%green(%X{userId:-anonymous})] [ip=%X{clientIp:-?}] %logger{40} - %msg%n</pattern>
+            </encoder>
+        </appender>
+
+        <!-- Audit log tập trung: khi chạy trong container, logs/ được mount ra thư mục logs/ trên máy -->
+        <appender name="AUDIT_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>logs/audit.log</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                <fileNamePattern>logs/audit.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+                <maxFileSize>10MB</maxFileSize>
+                <maxHistory>30</maxHistory>
+            </rollingPolicy>
+            <encoder>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [reqId=%X{requestId:-none}] [user=%X{userId:-anonymous}] [ip=%X{clientIp:-?}] %logger{40} - %msg%n</pattern>
             </encoder>
         </appender>
 
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="AUDIT_FILE"/>
         </root>
 
         <logger name="com.blogapi" level="DEBUG" additivity="false">
             <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="AUDIT_FILE"/>
         </logger>
     </springProfile>
 

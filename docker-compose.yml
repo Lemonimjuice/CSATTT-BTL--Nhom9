@@ -1,29 +1,24 @@
-# Hệ thống phòng thủ đa lớp của nhóm 9. Biến môi trường đọc từ .env (tạo bằng scripts/init-env.sh).
-# Danh sách cổng, service, biến: docs/contract/ports-and-env.md
+# Hệ thống phòng thủ đa lớp của nhóm 9: 4 container, 2 phân vùng mạng.
+# Biến môi trường đọc từ .env (tạo bằng scripts/init-env.sh). Chi tiết: docs/contract/ports-and-env.md
 #
-#   docker compose up -d --build --wait                 # stack chính: WAF + 2 node + DB
-#   docker compose --profile lab up -d --build --wait   # thêm lab cô lập cho cụm /api/v1/vuln
+#   docker compose up -d --build --wait     # dựng toàn bộ hệ thống
+#   docker compose stop backend-node-1       # Demo 1: đánh sập 1 node
 #
 # Lưu ý: PostgreSQL chỉ chạy database/init/*.sql khi volume postgres_data còn trống.
 # Sửa SQL xong phải chạy `docker compose down -v` rồi `up` lại (mất dữ liệu cũ).
 
 networks:
   dmz_net:
-    driver: bridge
+    driver: bridge            # vùng biên hướng ra Internet
   internal_net:
     driver: bridge
-    internal: true          # vùng lõi: không có đường ra Internet, không publish cổng
+    internal: true            # vùng lõi: không có đường ra Internet, không publish cổng
     ipam:
       config:
         - subnet: 10.209.10.0/24   # cố định để backend chỉ tin X-Forwarded-For từ IP của Nginx
-  lab_net:
-    driver: bridge
-    internal: true          # lab tách hẳn khỏi vùng lõi: không thấy DB nghiệp vụ, không ra Internet
-    ipam:
-      config:
-        - subnet: 10.209.20.0/24
 
-# Cấu hình chung cho 2 node: cùng image, cùng DB, cùng JWT secret (để Demo 1 không phải đăng nhập lại)
+# Cấu hình chung cho 2 node: cùng image, cùng DB, cùng JWT secret (để Demo 1 không phải đăng nhập lại).
+# Hai node cùng bật cụm /api/v1/vuln (bản lỗi) song song với /api/v1/secure (bản vá).
 x-backend: &backend
   build: ./backend
   image: nhom9/blog-api:local
@@ -34,8 +29,13 @@ x-backend: &backend
     DB_USERNAME: ${APP_DB_USERNAME:-app_user}      # tài khoản quyền tối thiểu, KHÔNG phải postgres_admin
     DB_PASSWORD: ${APP_DB_PASSWORD:?Đặt APP_DB_PASSWORD trong .env}
     JWT_SECRET: ${JWT_SECRET:?Đặt JWT_SECRET (Base64 >= 32 byte) trong .env}
-    SPRING_PROFILES_ACTIVE: integration           # ddl-auto=validate, không tự sửa schema
-    SQLI_DEMO_ENABLED: "false"                    # cụm /vuln không bao giờ bật trên backend chính
+    SPRING_PROFILES_ACTIVE: integration,sqli-lab
+    SQLI_DEMO_ENABLED: "true"                     # bật cụm /api/v1/vuln để đối chứng
+    # Dữ liệu SQLi nằm ở database "sqli_lab" KHÁC trong cùng PostgreSQL, tài khoản chỉ đọc.
+    # PostgreSQL không cho truy vấn chéo database, nên SQLi ở đây không chạm được bảng của blogdb.
+    SQLI_DEMO_DB_URL: jdbc:postgresql://database:5432/sqli_lab
+    SQLI_DEMO_DB_USERNAME: sqli_demo_reader
+    SQLI_DEMO_DB_PASSWORD: ${SQLI_LAB_READER_PASSWORD:?Đặt SQLI_LAB_READER_PASSWORD trong .env}
     TRUSTED_PROXY_REGEX: '10\.209\.10\.10'        # chỉ IP của nginx-waf được báo IP client
   depends_on:
     database:
@@ -52,10 +52,10 @@ x-backend: &backend
 
 services:
   nginx-waf:
+    container_name: nginx-waf
     # Nginx 1.30.6 + ModSecurity 3.0.17 + OWASP CRS 4.30.0, ghim theo digest để ai build cũng giống nhau
     image: owasp/modsecurity-crs:nginx-alpine@sha256:873ce68a658d2e3b61484a8a24d215f7d15456e7ce5aec5e7114bf000d743365
-    # Bỏ qua entrypoint sinh cấu hình từ biến môi trường của image: nhóm tự quản lý toàn bộ cấu hình.
-    entrypoint: [nginx, -g, "daemon off;"]
+    entrypoint: [nginx, -g, "daemon off;"]   # bỏ entrypoint sinh cấu hình từ biến môi trường của image
     command: []
     ports:
       - "80:8080"           # chỉ để redirect 80 -> 443
@@ -65,22 +65,19 @@ services:
       - ./nginx/certs:/etc/nginx/certs:ro
       - ./nginx/modsecurity:/etc/nginx/modsecurity:ro
       - ./nginx/modsecurity/mode/${WAF_MODE:-On}.conf:/etc/nginx/modsecurity-mode.conf:ro
-      - waf_audit:/var/log/modsecurity/audit   # modsec audit log (JSON), xem bằng scripts/waf-audit.sh
-    # Thay healthcheck mặc định của image (gọi /healthz, bị proxy xuống backend):
-    # chỉ kiểm tra Nginx còn phản hồi ở cổng HTTP nội bộ (redirect 301).
+      - ./logs/nginx:/var/log/nginx                      # access log Nginx
+      - ./logs/waf:/var/log/modsecurity/audit            # modsec_audit.log
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     healthcheck:
       test: [CMD-SHELL, "curl -so /dev/null http://127.0.0.1:8080/ || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 3
-    cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
     networks:
       dmz_net: {}
       internal_net:
         ipv4_address: 10.209.10.10
-      lab_net:
-        ipv4_address: 10.209.20.10
     depends_on:
       - backend-node-1
       - backend-node-2
@@ -88,11 +85,18 @@ services:
 
   backend-node-1:
     <<: *backend
+    container_name: backend-node-1
+    volumes:
+      - ./logs/backend-node-1:/app/logs   # audit log tập trung ra máy host
 
   backend-node-2:
     <<: *backend
+    container_name: backend-node-2
+    volumes:
+      - ./logs/backend-node-2:/app/logs
 
   database:
+    container_name: database
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: postgres_admin
@@ -101,9 +105,11 @@ services:
       # 02-least-privilege.sql đọc 2 biến này để tạo tài khoản ứng dụng
       APP_DB_USERNAME: ${APP_DB_USERNAME:-app_user}
       APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Đặt APP_DB_PASSWORD trong .env}
+      # 04-sqli-demo.sh đọc biến này để tạo tài khoản chỉ-đọc cho database sqli_lab
+      SQLI_LAB_READER_PASSWORD: ${SQLI_LAB_READER_PASSWORD:?Đặt SQLI_LAB_READER_PASSWORD trong .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/init:/docker-entrypoint-initdb.d:ro   # 01 schema, 02 quyền, 03 dữ liệu mẫu
+      - ./database/init:/docker-entrypoint-initdb.d:ro   # 01 schema, 02 quyền, 03 seed, 04 db sqli_lab
     healthcheck:
       # Cổng TCP chỉ mở sau khi các script init chạy xong (server init chỉ nghe qua socket)
       test: [CMD-SHELL, "pg_isready -h 127.0.0.1 -U postgres_admin -d blogdb"]
@@ -114,92 +120,5 @@ services:
       - internal_net
     restart: unless-stopped
 
-  # ---------------------------------------------------------------------------
-  # Lab cô lập (profile `lab`) cho cụm API lỗi /api/v1/vuln - Demo 2, 3, 4.
-  # Dựa trên backend/docker-compose.sqli-lab.yml của TV3: DB định danh và JWT secret riêng,
-  # DB fixture chỉ có 3 dòng giả, tài khoản đọc chỉ SELECT. Không service nào của lab nối
-  # vào internal_net, nên lỗi cố ý trong lab không chạm được dữ liệu nghiệp vụ.
-  # ---------------------------------------------------------------------------
-  sqli-lab-auth-db:
-    image: postgres:16-alpine
-    profiles: [lab]
-    mem_limit: 512m
-    pids_limit: 128
-    environment:
-      POSTGRES_DB: lab_identity
-      POSTGRES_PASSWORD: ${SQLI_LAB_AUTH_ADMIN_PASSWORD:?Đặt SQLI_LAB_AUTH_ADMIN_PASSWORD trong .env}
-      APP_DB_USERNAME: lab_identity_app
-      APP_DB_PASSWORD: ${SQLI_LAB_AUTH_APP_PASSWORD:?Đặt SQLI_LAB_AUTH_APP_PASSWORD trong .env}
-    tmpfs:
-      - /var/lib/postgresql/data   # dữ liệu lab mất khi container dừng: mỗi lần chạy là lab sạch
-    volumes:
-      - ./database/init:/docker-entrypoint-initdb.d:ro   # cùng schema, quyền và dữ liệu mẫu
-    healthcheck:
-      test: [CMD-SHELL, "pg_isready -h 127.0.0.1 -U postgres -d lab_identity"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-    networks:
-      - lab_net
-
-  sqli-lab-db:
-    image: postgres:16-alpine
-    profiles: [lab]
-    mem_limit: 512m
-    pids_limit: 128
-    command: [postgres, -c, shared_buffers=32MB, -c, max_connections=20]
-    environment:
-      POSTGRES_DB: sqli_lab
-      POSTGRES_USER: sqli_lab_admin
-      POSTGRES_PASSWORD: ${SQLI_LAB_ADMIN_PASSWORD:?Đặt SQLI_LAB_ADMIN_PASSWORD trong .env}
-      SQLI_LAB_READER_PASSWORD: ${SQLI_LAB_READER_PASSWORD:?Đặt SQLI_LAB_READER_PASSWORD trong .env}
-    tmpfs:
-      - /var/lib/postgresql/data
-    volumes:
-      - ./backend/docker/sqli-lab/init-demo.sh:/docker-entrypoint-initdb.d/10-init-demo.sh:ro
-    healthcheck:
-      test: [CMD-SHELL, "pg_isready -h 127.0.0.1 -U sqli_lab_admin -d sqli_lab"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
-    networks:
-      - lab_net
-
-  sqli-lab-api:
-    build: ./backend
-    image: nhom9/blog-api:local
-    profiles: [lab]
-    mem_limit: 768m
-    pids_limit: 256
-    environment:
-      DB_HOST: sqli-lab-auth-db
-      DB_PORT: "5432"
-      DB_NAME: lab_identity
-      DB_USERNAME: lab_identity_app
-      DB_PASSWORD: ${SQLI_LAB_AUTH_APP_PASSWORD:?Đặt SQLI_LAB_AUTH_APP_PASSWORD trong .env}
-      JWT_SECRET: ${SQLI_LAB_JWT_SECRET:?Đặt SQLI_LAB_JWT_SECRET (khác JWT_SECRET) trong .env}
-      SPRING_PROFILES_ACTIVE: integration,sqli-lab
-      SQLI_DEMO_ENABLED: "true"
-      SQLI_DEMO_DB_URL: jdbc:postgresql://sqli-lab-db:5432/sqli_lab
-      SQLI_DEMO_DB_USERNAME: sqli_demo_reader
-      SQLI_DEMO_DB_PASSWORD: ${SQLI_LAB_READER_PASSWORD:?Đặt SQLI_LAB_READER_PASSWORD trong .env}
-      TRUSTED_PROXY_REGEX: '10\.209\.20\.10'
-    depends_on:
-      sqli-lab-auth-db:
-        condition: service_healthy
-      sqli-lab-db:
-        condition: service_healthy
-    healthcheck:
-      test: [CMD-SHELL, "curl -fsS http://localhost:8080/actuator/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 60s
-    networks:
-      - lab_net
-    restart: unless-stopped
-
 volumes:
   postgres_data:
-  waf_audit:

@@ -28,22 +28,29 @@ Detailed standalone request/response and WAF notes: `backend/docs/BACKEND_HANDOV
 
 Latest verified result: 152 Maven / 42 HTTP secure-lab / 12 two-node PASS, 0 Maven failures/errors/skips. Details and limits: [Feature Freeze hardening](../../backend/docs/FEATURE_FREEZE.md).
 
-## Tích hợp nhóm qua Nginx + WAF (27/10/2026)
+## Tích hợp nhóm qua Nginx + WAF (cập nhật 27/10/2026)
 
-Truy cập qua `https://localhost` (Nginx + ModSecurity); backend không publish cổng ra host.
+Truy cập qua `https://localhost` (Nginx + ModSecurity); backend không publish cổng ra host. Cụm `/vuln` và
+`/secure` chạy trên cùng 2 node backend, dùng chung token lấy ở `POST /api/v1/auth/login`.
 
-**Cụm API lỗi bổ sung trong lab** (`VulnerablePostController`, cùng điều kiện với SQLi lab: profile `sqli-lab` và `SQLI_DEMO_ENABLED=true`, chỉ tồn tại trong `sqli-lab-api`):
+**Cặp đối chứng bài viết** (`SecurePostController` và `VulnerablePostController`; cụm `/vuln` chỉ hoạt động
+khi profile `sqli-lab` và `SQLI_DEMO_ENABLED=true`, đã bật trên 2 node):
 
-| Method and path | Lỗi cố ý | Bản vá tương ứng trên stack chính |
+| Method and path | Bản vá `/secure` | Bản lỗi `/vuln` |
 |---|---|---|
-| `GET /api/v1/vuln/posts/{id}` | Đọc mọi bài kể cả DRAFT/ARCHIVED; trả `author.email` | `GET /api/v1/posts/{id}`: nháp của người khác `403`, author không có email |
-| `PUT /api/v1/vuln/posts/{id}` | Không kiểm tra chủ sở hữu (IDOR); body `{ "title", "content" }` | `PUT /api/v1/posts/{id}`: người khác `403` |
-| `DELETE /api/v1/vuln/posts/{id}` | Không kiểm tra chủ sở hữu (IDOR) | `DELETE /api/v1/posts/{id}`: người khác `403` |
+| `GET /api/v1/{secure|vuln}/posts/{id}` | nháp của người khác `403`, author không email | đọc mọi trạng thái, trả `author.email` |
+| `PUT /api/v1/{secure|vuln}/posts/{id}` | người khác `403` | không kiểm tra chủ sở hữu (IDOR) |
+| `DELETE /api/v1/{secure|vuln}/posts/{id}` | người khác `403` | không kiểm tra chủ sở hữu (IDOR) |
 
-Các route này vẫn yêu cầu JWT của lab (`401` nếu thiếu hoặc dùng token stack chính).
+Thiếu/sai JWT trên các route này trả `401`.
 
-**Đường dẫn qua Nginx:** stack chính giữ nguyên đường dẫn. Lab: `/api/v1/vuln/...` giữ nguyên; các route khác của lab dùng tiền tố `/lab`, ví dụ đăng nhập lab là `POST /lab/api/v1/auth/login`.
+**SQLi Record**: `POST /api/v1/vuln/records/search` nối chuỗi `keyword`, truy vấn database `sqli_lab`
+(tài khoản chỉ-đọc, chỉ 3 dòng giả). PostgreSQL không cho truy vấn chéo database nên UNION sang `blogdb`
+thất bại (`400`). Bản vá `POST /api/v1/secure/records/search` bind tham số, chỉ trả Record của người gọi.
 
-**IP trong audit log:** profile `integration` bật `server.forward-headers-strategy: native` và chỉ tin `X-Forwarded-For` khi kết nối đến từ IP khớp `TRUSTED_PROXY_REGEX` (IP cố định của `nginx-waf`, Nginx đã ghi đè header này bằng IP thật). Mặc định (không có biến) không tin proxy nào, giữ hành vi của bản hardening. `ip=` trong log backend vì vậy là IP client thật khi đi qua Nginx.
+**IP trong audit log**: profile `integration` bật `server.forward-headers-strategy: native` và chỉ tin
+`X-Forwarded-For` khi kết nối đến từ IP khớp `TRUSTED_PROXY_REGEX` (IP cố định của `nginx-waf`). `ip=` trong
+log backend vì vậy là IP client thật khi đi qua Nginx.
 
-**Phân biệt 403:** WAF chặn trả `{"status":403,"message":"Request blocked by WAF","requestId":...}` kèm header `X-Blocked-By: waf`; 403 phân quyền của backend không có header này.
+**Phân biệt 403**: WAF chặn trả `{"status":403,"message":"Request blocked by WAF","requestId":...}` kèm header
+`X-Blocked-By: waf`; 403 phân quyền của backend không có header này.

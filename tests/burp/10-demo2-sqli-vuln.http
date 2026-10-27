@@ -1,6 +1,6 @@
 POST /api/v1/vuln/records/search HTTP/1.1
 Host: localhost
-Authorization: Bearer <TOKEN_LAB_USER_A>
+Authorization: Bearer <TOKEN_USER_A>
 Content-Type: application/json
 Content-Length: 25
 

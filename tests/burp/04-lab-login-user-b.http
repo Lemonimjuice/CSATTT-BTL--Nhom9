@@ -1,6 +1,0 @@
-POST /lab/api/v1/auth/login HTTP/1.1
-Host: localhost
-Content-Type: application/json
-Content-Length: 51
-
-{"username":"user_b","password":"UserB@Nhom9-2026"}

@@ -1,4 +1,4 @@
-PUT /api/v1/posts/3 HTTP/1.1
+PUT /api/v1/secure/posts/3 HTTP/1.1
 Host: localhost
 Content-Type: application/json
 Content-Length: 30

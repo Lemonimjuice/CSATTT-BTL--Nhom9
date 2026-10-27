@@ -20,10 +20,6 @@ APP_DB_USERNAME=app_user
 APP_DB_PASSWORD=$(hex)
 JWT_SECRET=$(b64)
 WAF_MODE=On
-SQLI_LAB_AUTH_ADMIN_PASSWORD=$(hex)
-SQLI_LAB_AUTH_APP_PASSWORD=$(hex)
-SQLI_LAB_ADMIN_PASSWORD=$(hex)
 SQLI_LAB_READER_PASSWORD=$(hex)
-SQLI_LAB_JWT_SECRET=$(b64)
 EOF
-echo "Đã tạo .env (10 biến, giá trị ngẫu nhiên)."
+echo "Đã tạo .env (6 biến, giá trị ngẫu nhiên)."

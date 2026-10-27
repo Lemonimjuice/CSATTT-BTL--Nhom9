@@ -25,9 +25,9 @@ check "IP giả 6.6.6.6 không xuất hiện trong log backend" 0 "$(echo "$LINE
 check "Log backend có IP client thật (không phải IP Nginx 10.209.10.10)" 0 "$(echo "$LINE" | grep -c 'ip=10\.209\.10\.10')"
 
 title "Bổ sung 3: một request ID xuyên suốt 3 lớp"
-TA=$(login /api/v1/auth/login "$USER_A" "$PASS_A") || exit 1
+TA=$(login "$USER_A" "$PASS_A") || exit 1
 s=$(req POST /api/v1/secure/records/search "$TA" '{"keyword":"alpha<script>alert(1)</script>"}'); RID=$(last_rid); sleep 1
-NG=$(docker compose logs --no-log-prefix nginx-waf 2>/dev/null | grep -c "rid=$RID")
+NG=$(nginx_log | grep -c "rid=$RID")
 WAF=$(waf_audit "$RID" | wc -l | tr -d " ")
 note "XSS vào route secure -> HTTP $s, rid $RID: log Nginx $NG dòng, audit WAF $WAF dòng"
 check "Nginx và WAF cùng ghi rid" "1 1" "$NG $WAF"

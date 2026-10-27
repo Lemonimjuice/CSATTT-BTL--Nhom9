@@ -5,7 +5,7 @@
 . "$(dirname "$0")/common.sh"
 
 title "Demo 1: HA & Failover"
-TA=$(login /api/v1/auth/login "$USER_A" "$PASS_A") || exit 1
+TA=$(login "$USER_A" "$PASS_A") || exit 1
 note "User A đã đăng nhập qua Nginx (token chỉ giữ trong biến, không in ra)."
 
 title "Bước 1: cả 2 node đang chạy, Round-Robin"
