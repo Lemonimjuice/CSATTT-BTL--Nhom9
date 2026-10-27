@@ -22,6 +22,8 @@ openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 365 \
     -addext "keyUsage=critical,digitalSignature,keyEncipherment" \
     -addext "extendedKeyUsage=serverAuth"
 
-chmod 600 server.key
-chmod 644 server.crt
+# 644 thay vì 600: image ModSecurity chạy Nginx bằng user không đặc quyền (uid 101), nên trên Linux
+# khóa thuộc user của máy với quyền 600 sẽ không đọc được và Nginx không khởi động.
+# Chấp nhận được cho chứng chỉ tự ký dùng trong lab; không áp dụng cho khóa thật.
+chmod 644 server.key server.crt
 openssl x509 -in server.crt -noout -subject -enddate -ext subjectAltName

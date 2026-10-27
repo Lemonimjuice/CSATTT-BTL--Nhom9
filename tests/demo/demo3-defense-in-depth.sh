@@ -8,17 +8,12 @@
 . "$(dirname "$0")/common.sh"
 PAYLOAD="' OR '1'='1"
 
-restore_waf() {
-    WAF_MODE=On docker compose up -d --no-deps --force-recreate nginx-waf >/dev/null 2>&1
-    sleep 3
-}
+restore_waf() { sh "$ROOT/scripts/waf-mode.sh" On >/dev/null 2>&1 || true; }
 
 title "Demo 3: Defense in Depth"
-title "Bước 1: giả lập WAF bị lách -> WAF_MODE=DetectionOnly"
-WAF_MODE=DetectionOnly docker compose up -d --no-deps --force-recreate nginx-waf >/dev/null 2>&1
-sleep 3
+title "Bước 1: giả lập WAF bị lách -> chế độ DetectionOnly"
 trap 'restore_waf; rm -rf "$TMP"' EXIT
-note "nginx-waf đã khởi động lại với SecRuleEngine DetectionOnly"
+sh "$ROOT/scripts/waf-mode.sh" DetectionOnly | sed 's/^/  /'
 
 TA=$(login "$USER_A" "$PASS_A") || exit 1
 

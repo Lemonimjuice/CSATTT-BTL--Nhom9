@@ -31,15 +31,19 @@ Không chụp token, mật khẩu vào ảnh báo cáo.
 
 ## Chuyển chế độ WAF (Demo 3)
 
-```bash
-WAF_MODE=DetectionOnly docker compose up -d --no-deps --force-recreate nginx-waf
-```
-
-Trả lại chế độ chặn:
+Chạy trong Git Bash, từ thư mục gốc repo:
 
 ```bash
-WAF_MODE=On docker compose up -d --no-deps --force-recreate nginx-waf
+sh scripts/waf-mode.sh DetectionOnly
 ```
+
+Xong Demo 3 **nhớ** trả lại chế độ chặn (không thì Demo 2 sẽ không bị chặn):
+
+```bash
+sh scripts/waf-mode.sh On
+```
+
+Xem chế độ đang chạy: `sh scripts/waf-mode.sh`.
 
 ## Tra bằng chứng theo request ID
 

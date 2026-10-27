@@ -1,13 +1,20 @@
 #!/bin/sh
-# Sinh file .env với mọi mật khẩu/khóa ngẫu nhiên. Chạy từ thư mục gốc repo (Git Bash):
+# Chuẩn bị môi trường chạy. Chạy từ thư mục gốc repo (Git Bash), chạy lại nhiều lần cũng an toàn:
 #   sh scripts/init-env.sh
-# Không ghi đè .env đã có; không in giá trị bí mật ra màn hình.
+# 1. Tạo các thư mục logs/ mà container ghi vào (audit log tập trung).
+# 2. Sinh file .env với mọi mật khẩu/khóa ngẫu nhiên, nếu chưa có. Không in giá trị bí mật.
 set -eu
 cd "$(dirname "$0")/.."
 
+# Tạo sẵn và cho phép ghi: trên Linux, nếu để Docker tự tạo thì thư mục thuộc root và Nginx (uid 101),
+# backend (user blogapi) không ghi được log, Nginx sẽ không khởi động. Windows/macOS không bị ảnh hưởng.
+mkdir -p logs/nginx logs/waf logs/backend-node-1 logs/backend-node-2
+chmod 777 logs/nginx logs/waf logs/backend-node-1 logs/backend-node-2
+echo "Thư mục logs/ đã sẵn sàng."
+
 if [ -f .env ]; then
-    echo ".env đã tồn tại, không ghi đè. Xóa file đó nếu muốn sinh lại (nhớ chạy 'docker compose down -v')."
-    exit 1
+    echo ".env đã có, giữ nguyên. Muốn sinh lại: xóa .env rồi chạy lại script này (nhớ 'docker compose down -v')."
+    exit 0
 fi
 
 hex() { openssl rand -hex 24; }
