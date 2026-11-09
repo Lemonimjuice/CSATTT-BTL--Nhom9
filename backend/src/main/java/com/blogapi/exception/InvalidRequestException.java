@@ -1,6 +1,6 @@
 package com.blogapi.exception;
 
-/** A rejected client pagination/sorting option, before building a repository query. */
+/** A rejected client input (pagination, sorting, comment reply target...), answered with 400. */
 public class InvalidRequestException extends RuntimeException {
     public InvalidRequestException(String message) { super(message); }
 }

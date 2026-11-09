@@ -11,7 +11,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Bản VÁ của các thao tác trên bài viết, làm cặp đối chứng với {@code /api/v1/vuln/posts} (chỉ có trong lab).
+ * Bản VÁ của các thao tác trên bài viết, làm cặp đối chứng với {@code /api/v1/vuln/posts} (bản lỗi cố ý,
+ * chạy song song trên cùng 2 node backend khi bật profile sqli-lab).
  * Dùng chung {@link PostService} với các route bài viết thường, nên thừa hưởng nguyên kiểm tra chủ sở hữu
  * (Ownership Check) ở tầng Service và phản hồi không chứa email tác giả.
  */

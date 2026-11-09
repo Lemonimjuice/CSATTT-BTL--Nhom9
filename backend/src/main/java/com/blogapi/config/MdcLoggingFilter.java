@@ -50,7 +50,8 @@ public class MdcLoggingFilter extends OncePerRequestFilter {
         MDC.put(MDC_REQUEST_ID, requestId);
         MDC.put(MDC_METHOD, request.getMethod());
         MDC.put(MDC_URI, request.getRequestURI());
-        // No proxy trust is configured: headers such as X-Forwarded-For are not IP evidence.
+        // Default: no proxy is trusted, so this is the socket peer. Profile `integration` trusts X-Forwarded-For
+        // only from the Nginx IP (TRUSTED_PROXY_REGEX), so behind Nginx this is the real client IP.
         MDC.put("clientIp", request.getRemoteAddr());
 
         // Add response header so clients can correlate

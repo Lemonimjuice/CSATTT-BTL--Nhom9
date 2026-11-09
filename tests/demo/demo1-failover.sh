@@ -32,7 +32,8 @@ done
 check "Request thành công sau khi node 1 sập (6 lần)" 6 "$OK"
 
 title "Log Nginx (5 dòng cuối): upstream có 2 địa chỉ = đã thử node 1 rồi chuyển sang node 2"
-docker compose logs --no-log-prefix --tail 40 nginx-waf 2>/dev/null | grep 'posts/me' | tail -5 | sed 's/^/  /'
+# Access log của Nginx ghi ra file logs/nginx/access.log (không ra console), nên đọc file qua nginx_log
+nginx_log | grep 'posts/me' | tail -5 | sed 's/^/  /'
 
 title "Bước 4: bật lại backend-node-1"
 docker compose start backend-node-1 >/dev/null 2>&1

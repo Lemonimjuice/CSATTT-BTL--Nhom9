@@ -6,6 +6,7 @@ import com.blogapi.entity.Comment;
 import com.blogapi.entity.Post;
 import com.blogapi.entity.User;
 import com.blogapi.exception.ForbiddenException;
+import com.blogapi.exception.InvalidRequestException;
 import com.blogapi.exception.ResourceNotFoundException;
 import com.blogapi.repository.CommentRepository;
 import com.blogapi.repository.PostRepository;
@@ -51,12 +52,12 @@ public class CommentServiceImpl implements CommentService {
 
             // Ensure the parent belongs to the same post
             if (!parent.getPost().getId().equals(postId)) {
-                throw new IllegalArgumentException("Parent comment does not belong to this post");
+                throw new InvalidRequestException("Parent comment does not belong to this post");
             }
             // Enforce depth cap to prevent infinite nesting
             depth = parent.getDepth() + 1;
             if (depth > MAX_DEPTH) {
-                throw new IllegalArgumentException(
+                throw new InvalidRequestException(
                         "Maximum comment nesting depth (%d) reached".formatted(MAX_DEPTH));
             }
         }

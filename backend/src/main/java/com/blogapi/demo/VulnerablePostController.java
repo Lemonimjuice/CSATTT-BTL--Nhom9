@@ -17,8 +17,9 @@ import org.springframework.web.bind.annotation.*;
 
 /**
  * Deliberately vulnerable copies of the original Post endpoints, for the comparison demos only.
- * Same conditions as the SQLi lab: they exist only in the isolated lab API (own identity DB and JWT key).
- * Secure counterparts on the main backend: GET/PUT/DELETE /api/v1/posts/{id}.
+ * Same conditions as the SQLi lab (profile sqli-lab and SQLI_DEMO_ENABLED=true): in the group stack they run on
+ * both main backend nodes, sharing their token, JWT key and blogdb database.
+ * Secure counterparts on the same nodes: GET/PUT/DELETE /api/v1/secure/posts/{id} (SecurePostController).
  */
 @RestController
 @RequestMapping("/api/v1/vuln/posts")

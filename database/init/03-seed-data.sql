@@ -1,7 +1,7 @@
 \set ON_ERROR_STOP on
 -- Dữ liệu mẫu cho kiểm thử và 4 demo. Chạy sau 01-schema.sql và 02-least-privilege.sql,
 -- bằng tài khoản quản trị trong lúc PostgreSQL khởi tạo volume trống.
--- Cùng file này được nạp cho DB chính (blogdb) và DB định danh của lab (lab_identity).
+-- Chỉ nạp cho DB chính (blogdb); database sqli_lab có dữ liệu giả riêng do 04-sqli-demo.sh tạo.
 --
 -- Tài khoản THỬ NGHIỆM (chỉ dùng trên máy lab, không dùng ở nơi khác):
 --   admin   / Admin@Nhom9-2026   (ADMIN)

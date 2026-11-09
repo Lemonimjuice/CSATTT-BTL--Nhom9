@@ -2,6 +2,7 @@ package com.blogapi.controller;
 
 import com.blogapi.dto.request.CommentRequests.*;
 import com.blogapi.dto.response.Responses.*;
+import com.blogapi.exception.InvalidRequestException;
 import com.blogapi.service.CommentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,8 @@ public class CommentController {
             @RequestParam(defaultValue = "0")  int page,
             @RequestParam(defaultValue = "20") int size,
             @AuthenticationPrincipal UserDetails userDetails) {
+        // Same rule as PostController: reject before PageRequest.of throws IllegalArgumentException (500).
+        if (page < 0 || size < 1) throw new InvalidRequestException("Invalid pagination");
         return ResponseEntity.ok(commentService.getByPost(
                 postId, PageRequest.of(page, Math.min(size, 100),
                         Sort.by(Sort.Direction.ASC, "createdAt")),
