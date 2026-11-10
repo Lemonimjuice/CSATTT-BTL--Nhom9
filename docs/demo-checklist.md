@@ -26,12 +26,12 @@ không chạy trong PowerShell hay CMD. Trên macOS/Linux dùng terminal bình t
 | Đăng nhập lại ngay trước mỗi demo | Access token hết hạn sau **15 phút**; token cũ trả `401`, dễ nhầm là failover hỏng hoặc chưa đăng nhập |
 | Để demo brute-force (rate limit) **cuối cùng** | Burp, Postman, trình duyệt trên cùng máy dùng chung hạn mức đăng nhập 5 lần/phút; sau brute-force phải chờ khoảng 1 phút |
 | Sau Demo 1, bật lại node: `docker compose start backend-node-1` | Script demo tự bật lại; làm tay thì phải nhớ |
-| Demo 3 đổi chế độ WAF bằng `sh scripts/waf-mode.sh DetectionOnly`, xong thì `sh scripts/waf-mode.sh On` | Quên bật lại thì WAF chỉ ghi log, không chặn Demo 2 |
+| Demo 3 đổi chế độ WAF bằng `sh scripts/waf-mode.sh DetectionOnly`, xong thì `sh scripts/waf-mode.sh On` (Windows: bấm đúp `scripts/WAF-DetectionOnly.bat`, xong thì `scripts/WAF-On.bat`) | Quên bật lại thì WAF chỉ ghi log, không chặn Demo 2 |
 | Bản lỗi `/api/v1/vuln/posts` sửa/xóa **dữ liệu thật** | Đừng xóa bài 3 (Demo 4 dùng bài này); lỡ xóa thì `sh scripts/reset-demo.sh --yes` |
 | Gõ tiếng Việt qua Postman/Burp/trình duyệt, không gõ thẳng trong `curl` trên terminal Windows | Terminal có thể gửi sai mã hóa, WAF trả `400 Failed to parse request body` (đúng là WAF chặn JSON hỏng) |
 | Tìm kiếm có dấu ở `/api/v1/vuln/records/search` bị WAF chặn `403` | Cố ý: luật vá ảo 100100 chỉ cho chữ không dấu, số và `. , _ -` |
 | Log ghi giờ UTC | Giờ Việt Nam = giờ trong log + 7. Log backend ghi kèm `Z` (UTC); log Nginx ghi `+0000` |
-| Tấn công từ **máy khác** trong mạng LAN | Docker Desktop (Windows/macOS) thường không giữ IP nguồn: Nginx thấy mọi máy là cùng một IP cổng Docker (vd. `172.21.0.1`), log và rate limit gộp chung. Demo từ chính máy chạy hệ thống thì không ảnh hưởng |
+| Tấn công từ **máy khác** trong mạng LAN | Làm theo [demo-2-may.md](demo-2-may.md). Docker Desktop (Windows/macOS) không giữ IP nguồn: Nginx thấy mọi máy là cùng một IP cổng Docker (vd. `172.21.0.1`), log và rate limit gộp chung (giải thích cho báo cáo ở mục 5 của file đó) |
 
 ## Sau khi trình bày: lấy minh chứng
 

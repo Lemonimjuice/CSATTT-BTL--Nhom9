@@ -97,7 +97,12 @@ Mọi route dùng chung token lấy ở `/api/v1/auth/login`.
 | Bổ sung | `tests/demo/demo5-ratelimit-audit.sh` | Brute-force đăng nhập bị `429`; IP giả trong `X-Forwarded-For` không vào audit log; 1 request ID xuyên suốt Nginx, WAF, backend; Swagger, actuator và cổng 80 không mở ra ngoài |
 
 Demo 3 đổi chế độ WAF bằng `sh scripts/waf-mode.sh DetectionOnly` và trả lại bằng `sh scripts/waf-mode.sh On`
-(script demo tự làm việc này).
+(script demo tự làm việc này). Trên Windows có thể bấm đúp `scripts/WAF-DetectionOnly.bat` và `scripts/WAF-On.bat`
+thay cho hai lệnh trên (không cần Git Bash).
+
+Demo trên 2 máy (một máy tấn công, một máy nạn nhân trong mạng LAN): xem [docs/demo-2-may.md](docs/demo-2-may.md).
+Máy tấn công chạy `sh tests/lan/attacker.sh <IP máy nạn nhân> all` hoặc dùng Burp/Postman; máy nạn nhân bấm đúp
+`scripts/Xem-Log.bat` để xem log 3 lớp theo thời gian thực.
 
 Kiểm thử thủ công: Postman trong `tests/postman/` (phủ toàn bộ API), mẫu request Burp trong `tests/burp/`
 (hướng dẫn trong [tests/burp/README.md](tests/burp/README.md)).
@@ -133,10 +138,14 @@ CSATTT-BTL--Nhom9/
 │   ├── preflight.sh                   # TV1 (kiểm tra nhanh toàn hệ thống trước khi trình bày)
 │   ├── reset-demo.sh                  # TV1 (xóa dữ liệu, dựng lại sạch với dữ liệu mẫu gốc)
 │   ├── waf-mode.sh                    # TV2 (đổi chế độ WAF On / DetectionOnly)
+│   ├── WAF-On.bat, WAF-DetectionOnly.bat, waf-mode.bat   # TV2 (Windows: bấm đúp để đổi chế độ WAF, không cần Git Bash)
+│   ├── Xem-Log.bat, Tra-RequestID.bat, xem-log.ps1   # TV4 (máy nạn nhân: xem log 3 lớp trực tiếp, tra request ID)
+│   ├── Demo1-TatNode1.bat, Demo1-BatNode1.bat        # TV4 (máy nạn nhân: tắt / bật lại backend-node-1)
 │   └── waf-audit.sh                   # TV2 (xem modsec_audit.log theo request ID)
 ├── docs/
 │   ├── decisions.md                   # Cả nhóm đề xuất, TV1 chốt (quy ước kỹ thuật chung)
 │   ├── demo-checklist.md              # TV4 (checklist trình bày, bảng xử lý sự cố; cả nhóm đọc)
+│   ├── demo-2-may.md                  # TV4 (demo một máy tấn công, một máy nạn nhân trong LAN)
 │   ├── test-evidence/                 # TV4 (hướng dẫn chụp minh chứng; bản gốc để trên Drive)
 │   └── contract/                      # TV3 chủ trì, cả nhóm đọc
 │       ├── api-endpoints.md           # TV3 (danh sách endpoint, cặp /vuln – /secure)
@@ -164,6 +173,7 @@ CSATTT-BTL--Nhom9/
 │       └── 04-sqli-demo.sh            # TV1 (database sqli_lab + tài khoản chỉ-đọc cho cụm /vuln)
 └── tests/                             # TV4
     ├── demo/                          # TV4 tổng hợp (run-all.sh, common.sh); mỗi demo do người phụ trách lớp đó kiểm
+    ├── lan/attacker.sh                # TV4 (chạy trên máy tấn công: demo qua mạng LAN)
     ├── postman/                       # TV4 (Postman Collection phủ toàn bộ API + environment)
     └── burp/                          # TV4 (mẫu request tấn công cho Repeater/Intruder)
 ```

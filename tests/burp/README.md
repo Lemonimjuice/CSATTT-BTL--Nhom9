@@ -12,6 +12,13 @@ Không chụp token, mật khẩu vào ảnh báo cáo.
 3. Rate limit của Nginx: 5 request/giây (API chung) và 5 request/phút, burst 5 (đăng nhập). Với Intruder,
    đặt Resource pool tối đa 1 request đồng thời, delay 300 ms; riêng kịch bản brute-force để nhanh để thấy `429`.
 
+## Tấn công từ máy khác trong mạng LAN
+
+Khi Burp chạy trên **máy tấn công** (máy nạn nhân chạy hệ thống), ở Repeater/Intruder đặt Target là
+`https://<IP_MÁY_NẠN_NHÂN>:443` thay cho `localhost`. Dòng `Host: localhost` trong các file `.http` giữ nguyên
+được (Nginx chỉ có một server HTTPS). Burp mặc định không kiểm tra chứng chỉ của server nên chứng chỉ tự ký
+không gây lỗi. Các bước phía máy nạn nhân (tắt node, đổi WAF, tra log) xem [docs/demo-2-may.md](../../docs/demo-2-may.md).
+
 ## Kịch bản theo demo
 
 | File | Demo | Kỳ vọng |
@@ -44,6 +51,9 @@ sh scripts/waf-mode.sh On
 ```
 
 Xem chế độ đang chạy: `sh scripts/waf-mode.sh`.
+
+Trên Windows không muốn gõ lệnh: bấm đúp `scripts/WAF-DetectionOnly.bat`, xong Demo 3 bấm đúp `scripts/WAF-On.bat`
+(không cần Git Bash; Docker Desktop phải đang chạy).
 
 ## Tra bằng chứng theo request ID
 

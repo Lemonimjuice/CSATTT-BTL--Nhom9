@@ -47,7 +47,7 @@ Cụm `/secure/posts` dùng chung tầng Service (có Ownership Check) với rou
 - **Audit log tập trung**: mọi log ghi ra thư mục `logs/` trên máy host: `logs/nginx/`, `logs/waf/modsec_audit.log`, `logs/backend-node-1/audit.log`, `logs/backend-node-2/audit.log`. Mẫu log backend có `reqId`, `user` và `ip` (IP client thật), gồm cả sự kiện đăng nhập, bị từ chối 401/403, sửa/xóa dữ liệu.
 - `modsec_audit.log` (JSON) chỉ ghi phần A, H, K, Z: không có header và body request, nên không lộ JWT, mật khẩu.
 - File audit của backend bỏ dòng healthcheck nội bộ của Docker (`/actuator/health` từ 127.0.0.1, mỗi 10 giây) bằng bộ lọc `LocalHealthCheckLogFilter`, chỉ gắn vào file; healthcheck đi qua Nginx vẫn được ghi. Thời gian trong file ghi kèm múi giờ (`Z` = UTC).
-- Chuyển chế độ WAF bằng `sh scripts/waf-mode.sh On|DetectionOnly`: kiểm tra giá trị hợp lệ, in chế độ đang chạy, cảnh báo khi đang DetectionOnly.
+- Chuyển chế độ WAF bằng `sh scripts/waf-mode.sh On|DetectionOnly`: kiểm tra giá trị hợp lệ, in chế độ đang chạy, cảnh báo khi đang DetectionOnly. Trên Windows có bản bấm đúp `scripts/WAF-On.bat` và `scripts/WAF-DetectionOnly.bat` (gọi `scripts/waf-mode.bat`, cùng cách làm, không cần Git Bash).
 
 ## D6. WAF: chế độ, ngưỡng, luật tùy chỉnh
 

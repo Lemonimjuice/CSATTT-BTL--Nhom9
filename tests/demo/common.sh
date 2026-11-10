@@ -21,7 +21,9 @@ note()  { printf '  %s\n' "$*"; }
 # req METHOD PATH [TOKEN] [JSON_BODY]  -> in mã trạng thái, lưu body/header vào $TMP/body, $TMP/head
 req() {
     _m=$1; _p=$2; _t=${3:-}; _d=${4:-}
-    set -- -s --cacert "$CA" -X "$_m" -o "$TMP/body" -D "$TMP/head" -w '%{http_code}'
+    set -- -s -X "$_m" -o "$TMP/body" -D "$TMP/head" -w '%{http_code}'
+    # INSECURE=1 (tests/lan/attacker.sh): máy tấn công không có chứng chỉ tự ký của máy nạn nhân nên bỏ kiểm tra.
+    if [ -n "${INSECURE:-}" ]; then set -- -k "$@"; else set -- --cacert "$CA" "$@"; fi
     [ -n "$_t" ] && set -- "$@" -H "Authorization: Bearer $_t"
     [ -n "$_d" ] && set -- "$@" -H 'Content-Type: application/json' --data-binary "$_d"
     curl "$@" "$BASE$_p"

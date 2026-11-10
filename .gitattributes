@@ -7,3 +7,5 @@
 *.yaml text eol=lf
 # Request thô cho Burp giữ nguyên CRLF như giao thức HTTP
 *.http -text
+# File bấm đúp cho Windows phải là CRLF (cmd.exe xử lý nhãn goto sai khi file chỉ có LF)
+*.bat  text eol=crlf
