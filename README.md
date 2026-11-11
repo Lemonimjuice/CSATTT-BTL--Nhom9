@@ -103,6 +103,7 @@ thay cho hai lệnh trên (không cần Git Bash).
 Demo trên 2 máy (một máy tấn công, một máy nạn nhân trong mạng LAN): xem [docs/demo-2-may.md](docs/demo-2-may.md).
 Máy tấn công chạy `sh tests/lan/attacker.sh <IP máy nạn nhân> all` hoặc dùng Burp/Postman; máy nạn nhân bấm đúp
 `scripts/Xem-Log.bat` để xem log 3 lớp theo thời gian thực.
+Hướng dẫn thực hành và trình bày cho cả nhóm (ai bấm gì, Burp/Postman từng bước): [docs/demo-huong-dan-thuc-hanh.md](docs/demo-huong-dan-thuc-hanh.md).
 
 Kiểm thử thủ công: Postman trong `tests/postman/` (phủ toàn bộ API), mẫu request Burp trong `tests/burp/`
 (hướng dẫn trong [tests/burp/README.md](tests/burp/README.md)).
@@ -146,6 +147,7 @@ CSATTT-BTL--Nhom9/
 │   ├── decisions.md                   # Cả nhóm đề xuất, TV1 chốt (quy ước kỹ thuật chung)
 │   ├── demo-checklist.md              # TV4 (checklist trình bày, bảng xử lý sự cố; cả nhóm đọc)
 │   ├── demo-2-may.md                  # TV4 (demo một máy tấn công, một máy nạn nhân trong LAN)
+│   ├── demo-huong-dan-thuc-hanh.md    # TV4 (hướng dẫn cả nhóm tập dượt và trình bày: Burp/Postman từng bước)
 │   ├── test-evidence/                 # TV4 (hướng dẫn chụp minh chứng; bản gốc để trên Drive)
 │   └── contract/                      # TV3 chủ trì, cả nhóm đọc
 │       ├── api-endpoints.md           # TV3 (danh sách endpoint, cặp /vuln – /secure)
